@@ -5,7 +5,14 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
-function createPrismaClient(env: { DB?: D1Database } | undefined = undefined) {
+export type PrismaEnvironment =
+  | {
+      DB?: D1Database;
+      prisma?: PrismaClient;
+    }
+  | undefined;
+
+function createPrismaClient(env?: PrismaEnvironment): PrismaClient {
   if (env?.DB) {
     const adapter = new PrismaD1(env.DB);
     return new PrismaClient({ adapter });
@@ -13,12 +20,17 @@ function createPrismaClient(env: { DB?: D1Database } | undefined = undefined) {
   return new PrismaClient();
 }
 
-const prisma = global.prismaGlobal ?? createPrismaClient();
+function isCloudflareWorker(): boolean {
+  return typeof process !== "undefined" && process.env.TARGET === "worker";
+}
+
+const prisma =
+  global.prismaGlobal ??
+  createPrismaClient(isCloudflareWorker() ? undefined : undefined);
 
 if (process.env.NODE_ENV !== "production") {
   global.prismaGlobal = prisma;
 }
 
+export { createPrismaClient };
 export default prisma;
-
-export type PrismaEnvironment = { DB: D1Database } | undefined;

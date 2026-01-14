@@ -1,42 +1,33 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import "@shopify/shopify-api/adapters/cf-worker";
-import prisma from "../app/db.server";
+// Polyfill process for Shopify library compatibility
+if (typeof process === "undefined") {
+  globalThis.process = { env: {} } as any;
+}
 
-// Import the server build from the built file
-import * as build from "../build/server/index.js";
+import { createPagesFunctionHandler } from "@react-router/cloudflare";
 
 interface Env {
-  DB: any;
+  DB: D1Database;
   SHOPIFY_API_KEY?: string;
   SHOPIFY_API_SECRET?: string;
   SHOPIFY_APP_URL?: string;
   SCOPES?: string;
   SHOP_CUSTOM_DOMAIN?: string;
   SESSION_SECRET?: string;
+  NODE_ENV?: string;
 }
 
-// Simple handler that works with the built server
-export default {
-  async fetch(
-    request: Request,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<Response> {
-    try {
-      // For now, return a simple response to test the deployment
-      return new Response(
-        JSON.stringify({
-          message: "Cloudflare Worker is working!",
-          buildExists: !!build,
-          buildKeys: Object.keys(build),
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error: any) {
-      return new Response(`Error: ${error.message}`, { status: 500 });
-    }
+export default createPagesFunctionHandler({
+  build: () =>
+    import("virtual:react-router/server-build").then((m: any) => m.build || m),
+  mode: "production",
+  getLoadContext({ context }: any) {
+    return {
+      cloudflare: {
+        env: context.env as Env,
+        ctx: context.ctx,
+      },
+    };
   },
-} satisfies ExportedHandler<Env>;
+});

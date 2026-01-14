@@ -1,10 +1,13 @@
 name = "rr-dd-poc"
-main = "./app/entry.worker.ts"
+main = "./build/server/index.js"
 compatibility_date = "2024-11-18"
 compatibility_flags = ["nodejs_compat"]
 
 [build]
 command = "npm run build"
+
+[build]
+command = "npm run build:worker"
 
 [vars]
 NODE_ENV = "production"
@@ -13,9 +16,3 @@ NODE_ENV = "production"
 binding = "DB"
 database_name = "rr-dd-poc-db"
 database_id = "50a4b203-ffc3-4cc4-9d43-25a992b88bb9"
-
-# Secrets to set via: wrangler secret put SHOPIFY_API_KEY
-# SHOPIFY_API_KEY
-# SHOPIFY_API_SECRET
-# SHOPIFY_SCOPES
-# SESSION_SECRET
