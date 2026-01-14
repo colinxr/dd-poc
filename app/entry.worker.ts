@@ -1,26 +1,42 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import "@shopify/shopify-api/adapters/cf-worker";
-import { createRequestHandler } from "@react-router/cloudflare";
-import type { AppLoadContext } from "react-router";
 import prisma from "../app/db.server";
 
-declare module "react-router" {
-  export interface AppLoadContext {
-    cloudflare: {
-      env: Env;
-      ctx: ExecutionContext;
-    };
-  }
+// Import the server build from the built file
+import * as build from "../build/server/index.js";
+
+interface Env {
+  DB: any;
+  SHOPIFY_API_KEY?: string;
+  SHOPIFY_API_SECRET?: string;
+  SHOPIFY_APP_URL?: string;
+  SCOPES?: string;
+  SHOP_CUSTOM_DOMAIN?: string;
+  SESSION_SECRET?: string;
 }
 
+// Simple handler that works with the built server
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const response = await createRequestHandler({
-      build: await import("virtual:react-router/server-build"),
-      mode: process.env.NODE_ENV,
-      getLoadContext(): AppLoadContext {
-        return { cloudflare: { env, ctx } };
-      },
-    })(request, { DB: prisma });
-    return response;
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
+    try {
+      // For now, return a simple response to test the deployment
+      return new Response(
+        JSON.stringify({
+          message: "Cloudflare Worker is working!",
+          buildExists: !!build,
+          buildKeys: Object.keys(build),
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    } catch (error: any) {
+      return new Response(`Error: ${error.message}`, { status: 500 });
+    }
   },
 } satisfies ExportedHandler<Env>;
