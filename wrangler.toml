@@ -8,7 +8,7 @@ NODE_ENV = "production"
 [[d1_databases]]
 binding = "DB"
 database_name = "rr-dd-poc-db"
-database_id = "${CLOUDFLARE_DATABASE_ID}"
+database_id = "50a4b203-ffc3-4cc4-9d43-25a992b88bb9"
 
 # Secrets to set via: wrangler secret put SHOPIFY_API_KEY
 # SHOPIFY_API_KEY
