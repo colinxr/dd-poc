@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { createContainer } from "../container";
 import { ValidationError } from "../services/shared/errors";
@@ -7,6 +7,17 @@ import {
   CustomerAlreadyExistsError,
   GraphQLError,
 } from "../services/hcp-customer/errors";
+
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  return new Response(null, { headers: CORS_HEADERS });
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
@@ -19,7 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: "Authentication failed",
           message: "Unable to authenticate app proxy request",
         }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
+        { status: 401, headers: CORS_HEADERS },
       );
     }
 
@@ -27,22 +38,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const service = container.HcpCustomerService;
 
     const formData = await request.formData();
-
     const result = await service.createCustomer(formData);
 
-    return Response.json(result, {
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify(result), { headers: CORS_HEADERS });
   } catch (error) {
     if (error instanceof ValidationError) {
-      return Response.json(
-        { errors: error.errors },
-        { status: error.statusCode },
-      );
+      return new Response(JSON.stringify({ errors: error.errors }), {
+        status: error.statusCode,
+        headers: CORS_HEADERS,
+      });
     }
     if (error instanceof CustomerAlreadyExistsError) {
-      return Response.json(
-        {
+      return new Response(
+        JSON.stringify({
           status: "error",
           code: error.statusCode,
           errors: [
@@ -52,32 +60,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             },
           ],
           existingCustomerId: error.existingCustomerId,
-        },
-        { status: error.statusCode },
+        }),
+        { status: error.statusCode, headers: CORS_HEADERS },
       );
     }
     if (error instanceof CustomerCreationError) {
-      return Response.json(
-        {
+      return new Response(
+        JSON.stringify({
           status: "error",
           code: error.statusCode,
           errors: error.errors,
-        },
-        { status: error.statusCode },
+        }),
+        { status: error.statusCode, headers: CORS_HEADERS },
       );
     }
     if (error instanceof GraphQLError) {
-      return Response.json(
-        {
+      return new Response(
+        JSON.stringify({
           status: "error",
           code: error.statusCode,
           error: error.message,
           graphqlErrors: error.graphqlErrors,
-        },
-        { status: error.statusCode },
+        }),
+        { status: error.statusCode, headers: CORS_HEADERS },
       );
     }
     console.error("Unexpected error:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: CORS_HEADERS,
+    });
   }
 };
