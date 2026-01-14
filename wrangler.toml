@@ -1,0 +1,17 @@
+name = "rr-dd-poc"
+main = "./app/entry.worker.ts"
+compatibility_date = "2024-11-18"
+
+[vars]
+NODE_ENV = "production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rr-dd-poc-db"
+database_id = "${CLOUDFLARE_DATABASE_ID}"
+
+# Secrets to set via: wrangler secret put SHOPIFY_API_KEY
+# SHOPIFY_API_KEY
+# SHOPIFY_API_SECRET
+# SHOPIFY_SCOPES
+# SESSION_SECRET
