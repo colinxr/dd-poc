@@ -33,8 +33,22 @@ const handleRequest = createRequestHandler({
   },
 });
 
+// Populate process.env with Cloudflare env vars for Shopify SDK compatibility
+function populateProcessEnv(env: Env) {
+  process.env.SHOPIFY_API_KEY = env.SHOPIFY_API_KEY;
+  process.env.SHOPIFY_API_SECRET = env.SHOPIFY_API_SECRET;
+  process.env.SHOPIFY_APP_URL = env.SHOPIFY_APP_URL;
+  process.env.SCOPES = env.SCOPES;
+  process.env.SHOP_CUSTOM_DOMAIN = env.SHOP_CUSTOM_DOMAIN;
+  process.env.SESSION_SECRET = env.SESSION_SECRET;
+  process.env.NODE_ENV = env.NODE_ENV;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    // Populate process.env before any modules that depend on it are used
+    populateProcessEnv(env);
+
     const prisma = createPrismaClient({ DB: env.DB });
 
     return prismaStorage.run(prisma, () => {
