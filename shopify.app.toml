@@ -2,7 +2,7 @@
 
 client_id = "f4af8d3974f1c2430dc42b880d6e5147"
 name = "Dev - Daily Dose HCP"
-application_url = "https://example.com"
+application_url = "https://rr-dd-poc.colinxr.workers.dev"
 embedded = true
 
 [build]
@@ -21,4 +21,4 @@ prefix = "apps"
 subpath = "hcp"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://rr-dd-poc.colinxr.workers.dev/api/auth" ]
