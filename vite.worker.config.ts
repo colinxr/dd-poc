@@ -1,9 +1,10 @@
 import { reactRouter } from "@react-router/dev/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "node:path";
 
-export default defineConfig(({ isSsrBuild }) => {
+export default defineConfig(({ isSsrBuild, mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [reactRouter(), tsconfigPaths()],
     resolve: {
@@ -20,6 +21,15 @@ export default defineConfig(({ isSsrBuild }) => {
           replacement: path.resolve(
             __dirname,
             "./app/shopify.server.worker.ts",
+          ),
+        },
+        // Force @prisma/client to use the main entry point to allow the adapter to take over
+        // This prevents it from pulling in the node-specific binary loader that triggers the "edge runtime" error check
+        {
+          find: "@prisma/client",
+          replacement: path.resolve(
+            __dirname,
+            "node_modules/@prisma/client/index.js",
           ),
         },
         // Standard aliases
@@ -49,6 +59,10 @@ export default defineConfig(({ isSsrBuild }) => {
     },
     define: {
       "process.env.TARGET": JSON.stringify("worker"),
+      "process.env.SHOPIFY_API_KEY": JSON.stringify(env.SHOPIFY_API_KEY),
+      "process.env.SHOPIFY_API_SECRET": JSON.stringify(env.SHOPIFY_API_SECRET),
+      "process.env.SHOPIFY_APP_URL": JSON.stringify(env.SHOPIFY_APP_URL),
+      "process.env.SCOPES": JSON.stringify(env.SCOPES),
     },
     ssr: {
       target: "webworker",
@@ -57,6 +71,11 @@ export default defineConfig(({ isSsrBuild }) => {
         conditions: ["workerd", "worker", "browser"],
         externalConditions: ["workerd", "worker"],
       },
+      external: ["node:async_hooks"], // Explicitly externalize node built-ins
+    },
+    // Explicitly optimize @prisma/client for the worker build to avoid Node.js fallbacks
+    optimizeDeps: {
+      include: ["@prisma/client", "@prisma/adapter-d1"],
     },
   };
 });
