@@ -25,27 +25,34 @@ export function createContainer(admin: AdminApi) {
   bottle.service("SampleValidator", SampleValidator);
 
   // Repositories (Request-scoped because of adminApi)
-  bottle.factory("CustomerRepository", (container) => {
-    return new CustomerRepository(container.adminApi);
-  });
-  bottle.factory("SampleRepository", (container) => {
-    return new SampleRepository(container.adminApi);
-  });
+  bottle.factory(
+    "CustomerRepository",
+    (container) => new CustomerRepository(container.adminApi),
+  );
+
+  bottle.factory(
+    "SampleRepository",
+    (container) => new SampleRepository(container.adminApi),
+  );
 
   // Services
-  bottle.factory("HcpCustomerService", (container) => {
-    return new HcpCustomerService(
-      container.CustomerRepository,
-      container.CustomerValidator
-    );
-  });
+  bottle.factory(
+    "CustomerService",
+    (container) =>
+      new HcpCustomerService(
+        container.CustomerRepository,
+        container.CustomerValidator,
+      ),
+  );
 
-  bottle.factory("HcpSamplesService", (container) => {
-    return new HcpSamplesService(
-      container.SampleRepository,
-      container.SampleValidator
-    );
-  });
+  bottle.factory(
+    "SamplesService",
+    (container) =>
+      new HcpSamplesService(
+        container.SampleRepository,
+        container.SampleValidator,
+      ),
+  );
 
   return bottle.container;
 }
