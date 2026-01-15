@@ -1,21 +1,15 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { createContainer } from "../container";
 import { ValidationError } from "../services/shared/errors";
+import { jsonResponse, CORS_HEADERS } from "../services/shared/api";
 import {
   CustomerCreationError,
-  CustomerAlreadyExistsError,
   GraphQLError,
+  CustomerAlreadyExistsError,
 } from "../services/hcp-customer/errors";
 
-const CORS_HEADERS = {
-  "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async () => {
   return new Response(null, { headers: CORS_HEADERS });
 };
 
@@ -25,70 +19,61 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (!context.admin) {
       console.error("App proxy authentication failed - no admin context");
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           error: "Authentication failed",
           message: "Unable to authenticate app proxy request",
-        }),
-        { status: 401, headers: CORS_HEADERS },
+        },
+        401,
       );
     }
 
-    const container = createContainer(context.admin);
-    const service = container.HcpCustomerService;
+    const { CustomerService } = createContainer(context.admin);
 
     const formData = await request.formData();
-    const result = await service.createCustomer(formData);
+    const result = await CustomerService.createCustomer(formData);
 
-    return new Response(JSON.stringify(result), { headers: CORS_HEADERS });
+    return jsonResponse(result);
   } catch (error) {
     if (error instanceof ValidationError) {
-      return new Response(JSON.stringify({ errors: error.errors }), {
-        status: error.statusCode,
-        headers: CORS_HEADERS,
-      });
+      return jsonResponse({ errors: error.errors }, error.statusCode);
     }
+
     if (error instanceof CustomerAlreadyExistsError) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           status: "error",
           code: error.statusCode,
-          errors: [
-            {
-              field: "email",
-              message: "A customer with this email already exists",
-            },
-          ],
-          existingCustomerId: error.existingCustomerId,
-        }),
-        { status: error.statusCode, headers: CORS_HEADERS },
+          errors: [{ field: "email", message: error.message }],
+        },
+        error.statusCode,
       );
     }
+
     if (error instanceof CustomerCreationError) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           status: "error",
           code: error.statusCode,
           errors: error.errors,
-        }),
-        { status: error.statusCode, headers: CORS_HEADERS },
+        },
+        error.statusCode,
       );
     }
+
     if (error instanceof GraphQLError) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           status: "error",
           code: error.statusCode,
           error: error.message,
           graphqlErrors: error.graphqlErrors,
-        }),
-        { status: error.statusCode, headers: CORS_HEADERS },
+        },
+        error.statusCode,
       );
     }
+
     console.error("Unexpected error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: CORS_HEADERS,
-    });
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 };
