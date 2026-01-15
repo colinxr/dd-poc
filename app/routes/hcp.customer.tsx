@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { createContainer } from "../container";
 import { ValidationError } from "../services/shared/errors";
 import { jsonResponse, CORS_HEADERS } from "../services/shared/api";
@@ -17,8 +17,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const context = await authenticate.public.appProxy(request);
 
-    if (!context.admin) {
-      console.error("App proxy authentication failed - no admin context");
+    if (!context.session?.shop) {
+      console.error("App proxy authentication failed - no shop in session");
       return jsonResponse(
         {
           error: "Authentication failed",
@@ -28,7 +28,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    const { CustomerService } = createContainer(context.admin);
+    const shop = context.session.shop;
+
+    // App proxy requests don't include an access token, so we need to fetch
+    // the offline session for this shop to make Admin API calls
+    let admin;
+    try {
+      const result = await unauthenticated.admin(shop);
+      admin = result.admin;
+    } catch (sessionError) {
+      console.error(
+        "Failed to get admin session for shop:",
+        shop,
+        sessionError,
+      );
+      return jsonResponse(
+        {
+          error: "Session not found",
+          message: `No offline session found for shop: ${shop}. The app may need to be reinstalled.`,
+        },
+        401,
+      );
+    }
+
+    const { CustomerService } = createContainer(admin);
 
     const formData = await request.formData();
     const result = await CustomerService.createCustomer(formData);
