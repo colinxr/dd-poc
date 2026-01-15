@@ -5,11 +5,11 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  const env = (context as any)?.cloudflare?.env;
+  return { apiKey: env?.SHOPIFY_API_KEY || "" };
 };
 
 export default function App() {

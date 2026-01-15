@@ -10,41 +10,54 @@ import prisma from "./db.server";
 
 export const apiVersion = ApiVersion.October25;
 
-// Store shopify instance in globalThis to survive module reloads and prevent Rollup optimization
-declare global {
-  var __shopifyApp: ShopifyApp | undefined;
+export interface ShopifyEnv {
+  SHOPIFY_API_KEY: string;
+  SHOPIFY_API_SECRET: string;
+  SHOPIFY_APP_URL?: string;
+  SCOPES?: string;
+  SHOP_CUSTOM_DOMAIN?: string;
 }
 
-function getShopify(): ShopifyApp {
-  if (!globalThis.__shopifyApp) {
-    // This check prevents Rollup from hoisting - it can't prove globalThis state at build time
-    if (typeof globalThis === "undefined") {
-      throw new Error("globalThis not available");
-    }
-    console.log("[shopify.server.worker] getShopify() initializing");
-    console.log("[shopify.server.worker] SHOPIFY_API_KEY from process.env:", !!process.env.SHOPIFY_API_KEY);
-    globalThis.__shopifyApp = shopifyApp({
-      apiKey: process.env.SHOPIFY_API_KEY,
-      apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+// Store shopify instance in globalThis - keyed by API key to handle multiple envs
+declare global {
+  var __shopifyAppInstance: ShopifyApp | undefined;
+  var __shopifyEnv: ShopifyEnv | undefined;
+}
+
+// Must be called once at the start of each request with the Cloudflare env
+export function initShopify(env: ShopifyEnv): void {
+  // Only reinitialize if env changed (or first time)
+  if (!globalThis.__shopifyAppInstance || globalThis.__shopifyEnv?.SHOPIFY_API_KEY !== env.SHOPIFY_API_KEY) {
+    globalThis.__shopifyEnv = env;
+    globalThis.__shopifyAppInstance = shopifyApp({
+      apiKey: env.SHOPIFY_API_KEY,
+      apiSecretKey: env.SHOPIFY_API_SECRET,
       apiVersion: ApiVersion.October25,
-      scopes: process.env.SCOPES?.split(","),
-      appUrl:
-        process.env.SHOPIFY_APP_URL || "https://rr-dd-poc.colinxr.workers.dev",
+      scopes: env.SCOPES?.split(","),
+      appUrl: env.SHOPIFY_APP_URL || "https://rr-dd-poc.colinxr.workers.dev",
       authPathPrefix: "/auth",
       sessionStorage: new WorkerSessionStorage(prisma),
       distribution: AppDistribution.AppStore,
       future: {
         expiringOfflineAccessTokens: false,
       },
-      ...(process.env.SHOP_CUSTOM_DOMAIN
-        ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
+      ...(env.SHOP_CUSTOM_DOMAIN
+        ? { customShopDomains: [env.SHOP_CUSTOM_DOMAIN] }
         : {}),
     });
   }
-  return globalThis.__shopifyApp;
 }
 
-// Export getters that lazily initialize shopify on first access
+function getShopify(): ShopifyApp {
+  if (!globalThis.__shopifyAppInstance) {
+    throw new Error(
+      "Shopify not initialized. Call initShopify(env) at the start of the request."
+    );
+  }
+  return globalThis.__shopifyAppInstance;
+}
+
+// Export getters that access the initialized instance
 export const addDocumentResponseHeaders = (...args: Parameters<ShopifyApp["addDocumentResponseHeaders"]>) =>
   getShopify().addDocumentResponseHeaders(...args);
 export const authenticate = new Proxy({} as ShopifyApp["authenticate"], {
