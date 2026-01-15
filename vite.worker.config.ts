@@ -59,10 +59,7 @@ export default defineConfig(({ isSsrBuild, mode }) => {
     },
     define: {
       "process.env.TARGET": JSON.stringify("worker"),
-      "process.env.SHOPIFY_API_KEY": JSON.stringify(env.SHOPIFY_API_KEY),
-      "process.env.SHOPIFY_API_SECRET": JSON.stringify(env.SHOPIFY_API_SECRET),
-      "process.env.SHOPIFY_APP_URL": JSON.stringify(env.SHOPIFY_APP_URL),
-      "process.env.SCOPES": JSON.stringify(env.SCOPES),
+      // Shopify env vars come from Cloudflare secrets at runtime, not build time
     },
     ssr: {
       target: "webworker",

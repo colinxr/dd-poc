@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "react-router build",
-    "build:worker": "TARGET=worker react-router build --config vite.worker.config.ts",
+    "build:worker": "prisma generate && TARGET=worker react-router build --config vite.worker.config.ts",
     "dev": "shopify app dev",
     "dev:wrangler": "npx wrangler dev --config wrangler.toml",
     "dev:worker": "vite --config vite.worker.config.ts",
