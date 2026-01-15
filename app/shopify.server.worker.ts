@@ -21,6 +21,8 @@ function getShopify(): ShopifyApp {
     if (typeof globalThis === "undefined") {
       throw new Error("globalThis not available");
     }
+    console.log("[shopify.server.worker] getShopify() initializing");
+    console.log("[shopify.server.worker] SHOPIFY_API_KEY from process.env:", !!process.env.SHOPIFY_API_KEY);
     globalThis.__shopifyApp = shopifyApp({
       apiKey: process.env.SHOPIFY_API_KEY,
       apiSecretKey: process.env.SHOPIFY_API_SECRET || "",

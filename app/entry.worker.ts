@@ -35,6 +35,8 @@ const handleRequest = createRequestHandler({
 
 // Populate process.env with Cloudflare env vars for Shopify SDK compatibility
 function populateProcessEnv(env: Env) {
+  console.log("[entry.worker] populateProcessEnv called with keys:", Object.keys(env));
+  console.log("[entry.worker] SHOPIFY_API_KEY present:", !!env.SHOPIFY_API_KEY);
   process.env.SHOPIFY_API_KEY = env.SHOPIFY_API_KEY;
   process.env.SHOPIFY_API_SECRET = env.SHOPIFY_API_SECRET;
   process.env.SHOPIFY_APP_URL = env.SHOPIFY_APP_URL;
