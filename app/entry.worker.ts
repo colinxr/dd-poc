@@ -5,7 +5,8 @@ if (typeof process === "undefined") {
   globalThis.process = { env: {} } as any;
 }
 
-import { createPagesFunctionHandler } from "@react-router/cloudflare";
+import { createRequestHandler } from "@react-router/cloudflare";
+import { prismaStorage, createPrismaClient } from "./db.server";
 
 interface Env {
   DB: D1Database;
@@ -18,10 +19,10 @@ interface Env {
   NODE_ENV?: string;
 }
 
-export default createPagesFunctionHandler({
+const handleRequest = createRequestHandler({
   build: () =>
     import("virtual:react-router/server-build").then((m: any) => m.build || m),
-  mode: "production",
+  mode: process.env.NODE_ENV || "production",
   getLoadContext({ context }: any) {
     return {
       cloudflare: {
@@ -31,3 +32,22 @@ export default createPagesFunctionHandler({
     };
   },
 });
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const prisma = createPrismaClient({ DB: env.DB });
+
+    return prismaStorage.run(prisma, () => {
+      return handleRequest({
+        request,
+        env,
+        waitUntil: ctx.waitUntil.bind(ctx),
+        passThroughOnException: ctx.passThroughOnException.bind(ctx),
+        params: {},
+        data: {},
+        next: () => Promise.resolve(new Response(null, { status: 404 })),
+        functionPath: "",
+      } as any);
+    });
+  },
+};
