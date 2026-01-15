@@ -91,6 +91,14 @@
   "overrides": {
     "p-map": "^4.0.0"
   },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "author": "colin",
   "prisma": {
     "seed": "node prisma/seed.js"
