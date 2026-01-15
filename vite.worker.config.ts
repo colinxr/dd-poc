@@ -6,7 +6,24 @@ import path from "node:path";
 export default defineConfig(({ isSsrBuild, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
-    plugins: [reactRouter(), tsconfigPaths()],
+    plugins: [
+      // Custom plugin to redirect shopify.server imports BEFORE tsconfigPaths resolves them
+      {
+        name: "shopify-server-redirect",
+        enforce: "pre",
+        resolveId(source, importer) {
+          if (source.endsWith("/shopify.server") || source.endsWith("/shopify.server.ts")) {
+            return path.resolve(__dirname, "./app/shopify.server.worker.ts");
+          }
+          if (source.endsWith("/entry.server") || source.endsWith("/entry.server.tsx")) {
+            return path.resolve(__dirname, "./app/entry.server.worker.tsx");
+          }
+          return null;
+        },
+      },
+      reactRouter(),
+      tsconfigPaths(),
+    ],
     resolve: {
       mainFields: ["browser", "module", "main"],
       alias: [
@@ -15,9 +32,10 @@ export default defineConfig(({ isSsrBuild, mode }) => {
           find: /.*\/app\/entry\.server\.tsx$/,
           replacement: path.resolve(__dirname, "./app/entry.server.worker.tsx"),
         },
-        // Same for shopify.server.ts to avoid Node adapter
+        // Same for shopify.server to avoid Node adapter
+        // Match with or without .ts extension since imports don't include extension
         {
-          find: /.*\/app\/shopify\.server\.ts$/,
+          find: /.*\/app\/shopify\.server(\.ts)?$/,
           replacement: path.resolve(
             __dirname,
             "./app/shopify.server.worker.ts",
