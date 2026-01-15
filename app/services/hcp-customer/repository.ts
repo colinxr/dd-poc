@@ -1,5 +1,10 @@
+import { HCP_CUSTOMER_TAG } from "./constants";
 import type { Customer, CustomerDTO } from "./types";
-import { GraphQLError, CustomerCreationError, CustomerAlreadyExistsError } from "./errors";
+import {
+  GraphQLError,
+  CustomerCreationError,
+  CustomerAlreadyExistsError,
+} from "./errors";
 
 interface AdminApi {
   graphql: (
@@ -37,12 +42,20 @@ export class CustomerRepository {
           statusText: query.statusText,
           body: errorText,
         });
-        throw new GraphQLError("Failed to query customers", query.status, undefined, [{ message: errorText }]);
+        throw new GraphQLError(
+          "Failed to query customers",
+          query.status,
+          undefined,
+          [{ message: errorText }],
+        );
       }
 
       const result = await query.json();
       if (result.errors) {
-        console.error("GraphQL errors in response:", JSON.stringify(result.errors, null, 2));
+        console.error(
+          "GraphQL errors in response:",
+          JSON.stringify(result.errors, null, 2),
+        );
         throw new GraphQLError(
           "GraphQL query failed",
           400,
@@ -54,8 +67,11 @@ export class CustomerRepository {
     } catch (error) {
       if (error instanceof GraphQLError) throw error;
       console.error("Unexpected error in findByEmail:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new GraphQLError("Failed to fetch customer by email", 500, error, [{ message: errorMessage }]);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new GraphQLError("Failed to fetch customer by email", 500, error, [
+        { message: errorMessage },
+      ]);
     }
   }
 
@@ -83,7 +99,7 @@ export class CustomerRepository {
               firstName: dto.firstName,
               lastName: dto.lastName,
               email: dto.email,
-              tags: ["HCP_PENDING"],
+              tags: dto.tags,
               addresses: [
                 {
                   address1: dto.businessAddress,
@@ -129,13 +145,23 @@ export class CustomerRepository {
           statusText: mutation.statusText,
           body: errorText,
         });
-        throw new GraphQLError("Failed to create customer", mutation.status, undefined, [{ message: errorText }]);
+        throw new GraphQLError(
+          "Failed to create customer",
+          mutation.status,
+          undefined,
+          [{ message: errorText }],
+        );
       }
 
       const result = await mutation.json();
 
+      console.log(result);
+
       if (result.errors) {
-        console.error("GraphQL errors in response:", JSON.stringify(result.errors, null, 2));
+        console.error(
+          "GraphQL errors in response:",
+          JSON.stringify(result.errors, null, 2),
+        );
         throw new GraphQLError(
           "GraphQL mutation failed",
           400,
@@ -145,7 +171,10 @@ export class CustomerRepository {
       }
 
       if (result.data?.customerCreate?.userErrors?.length > 0) {
-        console.error("Customer creation user errors:", result.data.customerCreate.userErrors);
+        console.error(
+          "Customer creation user errors:",
+          result.data.customerCreate.userErrors,
+        );
         throw new CustomerCreationError(result.data.customerCreate.userErrors);
       }
 
@@ -154,8 +183,11 @@ export class CustomerRepository {
       if (error instanceof CustomerCreationError) throw error;
       if (error instanceof GraphQLError) throw error;
       console.error("Unexpected error in create:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new GraphQLError("Failed to create customer", 500, error, [{ message: errorMessage }]);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new GraphQLError("Failed to create customer", 500, error, [
+        { message: errorMessage },
+      ]);
     }
   }
 }

@@ -1,4 +1,6 @@
-export interface CustomerDTO {
+import { HCP_CUSTOMER_TAG } from "./constants";
+
+export interface CreateCustomerInput {
   firstName: string;
   lastName: string;
   email: string;
@@ -12,6 +14,17 @@ export interface CustomerDTO {
   state: string;
   zipCode: string;
   country: string;
+}
+
+export type CustomerDTO = CreateCustomerInput & {
+  readonly tags: readonly [typeof HCP_CUSTOMER_TAG];
+};
+
+export function createCustomerDTO(data: CreateCustomerInput): CustomerDTO {
+  return {
+    ...data,
+    tags: [HCP_CUSTOMER_TAG] as const,
+  };
 }
 
 export interface ValidationError {
