@@ -15,13 +15,87 @@ RR-DD-POC is a Shopify embedded app built with **React Router v7** for managing 
 
 ## Dual Environment Architecture
 
+This app runs on **Node.js** locally and **Cloudflare Workers** in production. Since Cloudflare's edge runtime lacks Node.js APIs, we maintain parallel implementations for platform-specific code.
+
+### Environment Comparison
+
 | Aspect | Local Development | Production |
 |--------|-------------------|------------|
-| Server | `@react-router/node` | `@react-router/cloudflare` |
+| Runtime | Node.js | Cloudflare Workers (edge) |
+| Server adapter | `@react-router/node` | `@react-router/cloudflare` |
+| SSR streaming | `renderToPipeableStream` (Node streams) | `renderToReadableStream` (Web streams) |
 | Database | SQLite (`file:dev.sqlite`) | Cloudflare D1 |
-| Dev command | `npm run dev` | `npm run deploy` |
-| Build output | `build/server/index.js` | Cloudflare Workers |
+| Prisma client | Singleton on `globalThis` | Request-scoped via `AsyncLocalStorage` |
+| Env vars | `process.env.*` | Worker `env` parameter |
+| Shopify adapter | `@shopify/.../adapters/node` | `@shopify/shopify-api/adapters/web-api` |
 | Entry point | `app/entry.server.tsx` | `app/entry.worker.ts` |
+| Shopify config | `app/shopify.server.ts` | `app/shopify.server.worker.ts` |
+| Build config | `vite.config.ts` | `vite.worker.config.ts` |
+| Dev command | `npm run dev` | `npm run deploy` |
+
+### How File Switching Works
+
+The `vite.worker.config.ts` uses a custom Vite plugin (`shopify-server-redirect`) that rewrites imports at build time:
+
+```typescript
+// When TARGET=worker, these imports get redirected:
+"~/shopify.server" → "~/shopify.server.worker.ts"
+"~/entry.server"   → "~/entry.server.worker.tsx"
+```
+
+This allows routes and services to import from `~/shopify.server` without knowing which environment they're in.
+
+### Shopify Initialization Differences
+
+**Node (module-level singleton)** — `shopify.server.ts`:
+```typescript
+// Initialized once when module loads
+const shopify = shopifyApp({ apiKey: process.env.SHOPIFY_API_KEY, ... });
+export const authenticate = shopify.authenticate;
+```
+
+**Cloudflare (lazy per-request)** — `shopify.server.worker.ts`:
+```typescript
+// Must be called each request with runtime env
+export function initShopify(env: Env) {
+  globalThis.__shopifyAppInstance = shopifyApp({ apiKey: env.SHOPIFY_API_KEY, ... });
+}
+// Exports are proxies that delegate to the initialized instance
+export const authenticate = new Proxy({}, { get: (_, prop) => getInstance().authenticate[prop] });
+```
+
+### Database Client Differences
+
+**Node** — Uses a singleton pattern:
+```typescript
+globalThis.prismaGlobal ??= new PrismaClient();
+```
+
+**Cloudflare** — Uses `AsyncLocalStorage` for request-scoped clients:
+```typescript
+// entry.worker.ts
+const prisma = new PrismaClient({ adapter: new PrismaD1(env.DB) });
+prismaStorage.run(prisma, () => handleRequest(...));
+```
+
+The `db.server.ts` file exports a Proxy that detects the runtime via `process.env.TARGET === "worker"` and retrieves the client from the appropriate source.
+
+### Worker Entry Point Flow
+
+`entry.worker.ts` is the Cloudflare Worker's `fetch` handler:
+
+```typescript
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    initShopify(env);                        // 1. Initialize Shopify with runtime secrets
+    const prisma = createPrismaClient(env);  // 2. Create D1-backed Prisma client
+    
+    return prismaStorage.run(prisma, () =>   // 3. Scope client to this request
+      requestHandler(request, { cloudflare: { env, ctx } })
+    );
+  }
+}
+```
 
 ## Directory Structure
 
@@ -35,23 +109,34 @@ rr-dd-poc/
 │   │   ├── hcp-samples/     # Sample request service
 │   │   └── shared/          # Shared utilities
 │   ├── root.tsx             # App root component
-│   ├── entry.server.tsx     # SSR entry point (local)
-│   ├── entry.worker.ts      # Cloudflare Workers entry point (production)
-│   ├── shopify.server.ts    # Shopify auth setup
-│   ├── db.server.ts         # Prisma client (conditional SQLite/D1)
+│   │
+│   │   # Node.js entry points (local development)
+│   ├── entry.server.tsx     # SSR with Node streams
+│   ├── shopify.server.ts    # Module-level Shopify init
+│   │
+│   │   # Cloudflare entry points (production)
+│   ├── entry.worker.ts      # Worker fetch handler (main entry)
+│   ├── entry.server.worker.tsx  # SSR with Web streams
+│   ├── shopify.server.worker.ts # Per-request Shopify init
+│   │
+│   │   # Shared (works in both environments)
+│   ├── db.server.ts         # Prisma client (runtime detection)
+│   ├── worker-session-storage.ts  # Shopify session storage
 │   └── routes.ts            # Route config (flatRoutes)
+│
 ├── __tests__/               # Test files
 │   ├── fixtures/            # Mock data, DI container
 │   ├── unit/                # Unit tests
 │   └── integration/         # Route integration tests
 ├── prisma/
-│   ├── schema.prisma        # Database schema
+│   ├── schema.prisma        # Database schema (SQLite provider, works with D1)
 │   └── schema.mjs           # D1 adapter config (production)
-├── wrangler.toml            # Cloudflare Workers config
+├── vite.config.ts           # Dev build config (Node.js)
+├── vite.worker.config.ts    # Prod build config (Cloudflare) with import redirects
+├── wrangler.toml            # Cloudflare Workers config with D1 binding
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml       # CI/CD pipeline
-├── vite.config.ts
 ├── vitest.config.ts
 ├── tsconfig.json
 ├── shopify.app.toml
@@ -239,22 +324,50 @@ npm run test:coverage # With coverage report
 
 ## Key Files
 
+### Core Application
 | File | Purpose |
 |------|---------|
 | `app/routes.ts` | Auto-generates routes from `app/routes/` files |
-| `app/shopify.server.ts` | Shopify app initialization with auth |
 | `app/container/index.ts` | DI container with BottleJS |
+| `app/db.server.ts` | Prisma client with runtime detection (singleton vs AsyncLocalStorage) |
+| `app/worker-session-storage.ts` | Custom Shopify session storage (works with both SQLite and D1) |
+
+### Platform-Specific Entry Points
+| File | Environment | Purpose |
+|------|-------------|---------|
+| `app/entry.server.tsx` | Node.js | SSR with `renderToPipeableStream` |
+| `app/entry.server.worker.tsx` | Cloudflare | SSR with `renderToReadableStream` |
+| `app/entry.worker.ts` | Cloudflare | Worker `fetch` handler (main entry) |
+| `app/shopify.server.ts` | Node.js | Module-level Shopify init |
+| `app/shopify.server.worker.ts` | Cloudflare | Lazy per-request Shopify init |
+
+### Build Configuration
+| File | Purpose |
+|------|---------|
+| `vite.config.ts` | Development build (Node.js) |
+| `vite.worker.config.ts` | Production build (Cloudflare) — contains import redirects |
+| `wrangler.toml` | Cloudflare Workers config with D1 binding |
+| `prisma/schema.mjs` | Prisma D1 adapter configuration |
+
+### Services Layer
+| File | Purpose |
+|------|---------|
 | `app/services/*/repository.ts` | GraphQL operations for Shopify Admin API |
 | `app/services/*/validator.ts` | Zod schema validation |
 | `app/services/*/service.ts` | Business logic orchestration |
+
+### Routes
+| File | Purpose |
+|------|---------|
 | `app/routes/hcp.customer.tsx` | App proxy route for customer creation |
 | `app/routes/hcp.samples.tsx` | App proxy route for sample requests |
+
+### Testing & Config
+| File | Purpose |
+|------|---------|
 | `__tests__/fixtures/container.ts` | Test container with mocked dependencies |
 | `vitest.config.ts` | Test configuration |
 | `shopify.app.toml` | Shopify app configuration |
-| `wrangler.toml` | Cloudflare Workers configuration |
-| `app/entry.worker.ts` | Cloudflare Workers entry point |
-| `prisma/schema.mjs` | Prisma D1 adapter configuration |
 | `.github/workflows/deploy.yml` | CI/CD deployment pipeline |
 
 ## App Proxy Configuration
