@@ -115,20 +115,20 @@ export class CustomerRepository {
               ],
               metafields: [
                 {
-                  namespace: "custom",
-                  key: "hcp_speciality",
+                  namespace: "hcp",
+                  key: "speciality",
                   value: dto.specialty,
                   type: "single_line_text_field",
                 },
                 {
-                  namespace: "custom",
-                  key: "hcp_credentials",
+                  namespace: "hcp",
+                  key: "credentials",
                   value: dto.credentials,
                   type: "single_line_text_field",
                 },
                 {
-                  namespace: "custom",
-                  key: "hcp_license",
+                  namespace: "hcp",
+                  key: "license",
                   value: dto.licenseNpi,
                   type: "single_line_text_field",
                 },
