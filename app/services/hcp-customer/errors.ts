@@ -13,19 +13,8 @@ export class GraphQLError extends Error {
 export class CustomerCreationError extends Error {
   public statusCode = 422;
 
-  constructor(
-    public errors: Array<{ field: string; message: string }>,
-  ) {
+  constructor(public errors: Array<{ field: string; message: string }>) {
     super("Customer creation failed");
     this.name = "CustomerCreationError";
-  }
-}
-
-export class CustomerAlreadyExistsError extends Error {
-  public statusCode = 409;
-
-  constructor(public existingCustomerId: string) {
-    super("Customer already exists");
-    this.name = "CustomerAlreadyExistsError";
   }
 }

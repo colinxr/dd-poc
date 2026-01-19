@@ -1,243 +1,599 @@
-# Shopify App Template - React Router
+# Shopify App - React Router + Cloudflare Workers
 
-This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/).  It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
+A Shopify embedded app built with **React Router v7** that runs on **Cloudflare Workers** (edge runtime) for production, with Node.js for local development.
 
-Rather than cloning this repo, follow the [Quick Start steps](https://github.com/Shopify/shopify-app-template-react-router#quick-start).
+This is a fork of the [official Shopify React Router template](https://github.com/Shopify/shopify-app-template-react-router), modified to support Cloudflare's edge runtime instead of Node.js.
 
-Visit the [`shopify.dev` documentation](https://shopify.dev/docs/api/shopify-app-react-router) for more details on the React Router app package.
+---
 
-## Upgrading from Remix
+## Table of Contents
 
-If you have an existing Remix app that you want to upgrade to React Router, please follow the [upgrade guide](https://github.com/Shopify/shopify-app-template-react-router/wiki/Upgrading-from-Remix).  Otherwise, please follow the quick start guide below.
+1. [Architecture Overview](#architecture-overview)
+2. [Dual Environment Strategy](#dual-environment-strategy)
+3. [Key Files & Entry Points](#key-files--entry-points)
+4. [The "File Swapping" Mechanism](#the-file-swapping-mechanism)
+5. [State Management (The Cloudflare Challenge)](#state-management-the-cloudflare-challenge)
+6. [Database (Prisma + D1)](#database-prisma--d1)
+7. [Services Layer](#services-layer)
+8. [Setup & Development](#setup--development)
+9. [Deployment](#deployment)
+10. [Common Patterns](#common-patterns)
 
-## Quick start
+---
 
-### Prerequisites
+## Architecture Overview
 
-Before you begin, you'll need the following:
+This app is designed to work in **two distinct environments**:
 
-1. **Node.js**: [Download and install](https://nodejs.org/en/download/) it if you haven't already.
-2. **Shopify Partner Account**: [Create an account](https://partners.shopify.com/signup) if you don't have one.
-3. **Test Store**: Set up either a [development store](https://help.shopify.com/en/partners/dashboard/development-stores#create-a-development-store) or a [Shopify Plus sandbox store](https://help.shopify.com/en/partners/dashboard/managing-stores/plus-sandbox-store) for testing your app.
-4. **Shopify CLI**: [Download and install](https://shopify.dev/docs/apps/tools/cli/getting-started) it if you haven't already.
-```shell
-npm install -g @shopify/cli@latest
+| Aspect             | Local Development                  | Production                             |
+| ------------------ | ---------------------------------- | -------------------------------------- |
+| **Runtime**        | Node.js                            | Cloudflare Workers (Edge)              |
+| **Server Adapter** | `@react-router/node`               | `@react-router/cloudflare`             |
+| **Database**       | SQLite (`file:dev.sqlite`)         | Cloudflare D1                          |
+| **Prisma Client**  | Singleton on `global`              | Request-scoped via `AsyncLocalStorage` |
+| **SSR Streams**    | Node.js Streams (`PipeableStream`) | Web Streams (`ReadableStream`)         |
+| **Build Config**   | `vite.config.ts`                   | `vite.worker.config.ts`                |
+
+---
+
+## Dual Environment Strategy
+
+The core challenge with Cloudflare Workers is that they **lack Node.js APIs**. We cannot use `process.env`, Node.js streams, or global singletons in the same way.
+
+To solve this, we maintain **platform-specific implementations** for infrastructure code (entry points, database, Shopify config) while keeping business logic (routes, services, UI) platform-agnostic.
+
+### Build-Time File Swapping
+
+A custom Vite plugin intercepts imports during the production build and redirects them to Cloudflare-compatible files:
+
+| Import (Routes/Services)                          | Build Result                      |
+| ------------------------------------------------- | --------------------------------- |
+| `import { authenticate } from "~/shopify.server"` | Uses `shopify.server.worker.ts`   |
+| `import prisma from "~/db.server"`                | Uses D1 adapter instead of SQLite |
+
+---
+
+## Key Files & Entry Points
+
+```
+app/
+├── entry.server.tsx           # Node.js SSR entry (local)
+├── entry.server.worker.tsx    # Cloudflare SSR entry (production)
+├── entry.worker.ts            # Cloudflare fetch handler (production)
+├── shopify.server.ts          # Node.js Shopify init (local)
+├── shopify.server.worker.ts   # Cloudflare Shopify init (production)
+├── db.server.ts               # Prisma client (runtime detection)
+└── worker-session-storage.ts  # Session storage (shared)
 ```
 
-### Setup
+### Entry Points Comparison
 
-```shell
-shopify app init --template=https://github.com/Shopify/shopify-app-template-react-router
-```
+| File                      | Purpose                                                                     |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `entry.server.tsx`        | Uses `renderToPipeableStream` + Node streams.                               |
+| `entry.server.worker.tsx` | Uses `renderToReadableStream` + Web streams.                                |
+| `entry.worker.ts`         | The main Cloudflare fetch handler. Initializes Shopify + DB before routing. |
 
-### Local Development
+---
 
-```shell
-shopify app dev
-```
+## The "File Swapping" Mechanism
 
-Press P to open the URL to your app. Once you click install, you can start development.
+`vite.worker.config.ts` contains a custom Vite plugin (`shopify-server-redirect`) that runs **before** TypeScript resolution. It intercepts imports of Node.js-specific files and redirects them to their Worker counterparts.
 
-Local development is powered by [the Shopify CLI](https://shopify.dev/docs/apps/tools/cli). It logs into your partners account, connects to an app, provides environment variables, updates remote config, creates a tunnel and provides commands to generate extensions.
-
-### Authenticating and querying data
-
-To authenticate and query data you can use the `shopify` const that is exported from `/app/shopify.server.js`:
-
-```js
-export async function loader({ request }) {
-  const { admin } = await shopify.authenticate.admin(request);
-
-  const response = await admin.graphql(`
-    {
-      products(first: 25) {
-        nodes {
-          title
-          description
-        }
-      }
-    }`);
-
-  const {
-    data: {
-      products: { nodes },
-    },
-  } = await response.json();
-
-  return nodes;
+```typescript
+// vite.worker.config.ts
+{
+  name: "shopify-server-redirect",
+  enforce: "pre",
+  resolveId(source) {
+    if (source.endsWith("/shopify.server")) {
+      return "./app/shopify.server.worker.ts";
+    }
+    if (source.endsWith("/entry.server")) {
+      return "./app/entry.server.worker.tsx";
+    }
+  }
 }
 ```
 
-This template comes pre-configured with examples of:
+This allows your routes to import from `~/shopify.server` without knowing which environment they're running in.
 
-1. Setting up your Shopify app in [/app/shopify.server.ts](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/shopify.server.ts)
-2. Querying data using Graphql. Please see: [/app/routes/app.\_index.tsx](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/routes/app._index.tsx).
-3. Responding to webhooks. Please see [/app/routes/webhooks.tsx](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/routes/webhooks.app.uninstalled.tsx).
+---
 
-Please read the [documentation for @shopify/shopify-app-react-router](https://shopify.dev/docs/api/shopify-app-react-router) to see what other API's are available.
+## State Management (The Cloudflare Challenge)
 
-## Shopify Dev MCP
+### The Problem
 
-This template is configured with the Shopify Dev MCP. This instructs [Cursor](https://cursor.com/), [GitHub Copilot](https://github.com/features/copilot) and [Claude Code](https://claude.com/product/claude-code) and [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) to use the Shopify Dev MCP.  
+In Node.js, you typically initialize global clients at module scope:
 
-For more information on the Shopify Dev MCP please read [the  documentation](https://shopify.dev/docs/apps/build/devmcp).
+```typescript
+// Node.js style (works because process.env is available at build/start time)
+const shopify = shopifyApp({ apiKey: process.env.SHOPIFY_API_KEY });
+export const authenticate = shopify.authenticate;
+```
+
+In Cloudflare Workers, `process.env` is **undefined** at module load time. Environment variables only exist inside the `fetch(request, env)` handler.
+
+### The Solution: Lazy Initialization + Proxies
+
+We use a "Bridge" pattern:
+
+1.  **Request Starts**: `entry.worker.ts` calls `initShopify(env)` with runtime secrets.
+2.  **Route Imports**: Routes import `authenticate` (a Proxy object).
+3.  **Route Calls**: When `authenticate.admin(request)` is called, the Proxy forwards it to the initialized instance.
+
+```typescript
+// shopify.server.worker.ts
+let appInstance: ShopifyApp | undefined;
+
+export function initShopify(env: ShopifyEnv) {
+  appInstance = shopifyApp({ apiKey: env.SHOPIFY_API_KEY, ... });
+}
+
+// The Proxy "waits" for initShopify to be called
+export const authenticate = new Proxy({}, {
+  get(_, prop) {
+    return getApp().authenticate[prop]; // getApp() throws if not initialized
+  }
+});
+```
+
+---
+
+## Database (Prisma + D1)
+
+### The Abstraction
+
+`app/db.server.ts` exports a Prisma client that automatically switches implementation:
+
+- **Node.js**: Uses `new PrismaClient()` with SQLite. Singleton pattern prevents connection exhaustion.
+- **Cloudflare**: Uses `new PrismaClient({ adapter: new PrismaD1(env.DB) })`. Request-scoped pattern required because D1 binding is unique per request.
+
+### Request Scoping
+
+Cloudflare requires the D1 client to be created **per request** (the binding comes from the runtime). We use `AsyncLocalStorage` to make the client available to the app without passing it through every function:
+
+```typescript
+// entry.worker.ts
+const prisma = createPrismaClient({ DB: env.DB });
+prismaStorage.run(prisma, () => handleRequest(...));
+```
+
+Anywhere in your app, you can simply `import prisma from "~/db.server"` and it will resolve to the correct client for the current request.
+
+---
+
+## Services Layer
+
+The app follows a **Repository + Validator + Service** pattern for clean separation of concerns. This architecture is used for all business logic including HCP customer and sample management.
+
+### Directory Structure
+
+```
+app/services/
+├── hcp-customer/           # HCP customer creation service
+│   ├── constants.ts        # Constants (e.g., customer tags)
+│   ├── dto.ts              # Data transfer objects & form parsers
+│   ├── errors.ts           # Domain-specific error classes
+│   ├── repository.ts       # GraphQL operations for customers
+│   ├── service.ts          # Business logic orchestration
+│   ├── types.ts            # TypeScript interfaces
+│   └── validator.ts        # Zod validation schemas
+├── hcp-samples/            # Sample request service (same pattern)
+└── shared/
+    ├── api.ts              # JSON response helpers
+    └── errors.ts           # Base error classes (ValidationError)
+```
+
+### Request Flow
+
+```
+HTTP Request (POST /hcp/customer)
+         |
+         v
+┌─────────────────────────────────────────────────────────────┐
+│ app/routes/hcp.customer.tsx                                 │
+│ 1. authenticate.public.appProxy(request) - Validate app     │
+│    proxy request and get session                            │
+│ 2. unauthenticated.admin(shop) - Get admin API access token │
+│ 3. createContainer(admin) - Create DI container             │
+│ 4. CustomerService.createCustomer(formData) - Call service  │
+│ 5. Return JSON response with error handling                 │
+└─────────────────────────────────────────────────────────────┘
+         |
+         v
+┌─────────────────────────────────────────────────────────────┐
+│ HcpCustomerService (app/services/hcp-customer/service.ts)    │
+│ 1. CustomerRepository.create(dto) - Create customer         │
+│    (Shopify mutation handles duplicate email validation)    │
+│ 2. Return { customer, message }                             │
+└─────────────────────────────────────────────────────────────┘
+         |
+         v
+┌─────────────────────────────────────────────────────────────┐
+│ CustomerRepository (app/services/hcp-customer/repository.ts) │
+│ - Executes GraphQL queries/mutations against Shopify Admin  │
+│ - Handles error responses and userErrors                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Dependency Injection Container
+
+**File:** `app/container/index.ts`
+
+The app uses **BottleJS** for dependency injection with a factory pattern:
+
+```typescript
+export function createContainer(admin: AdminApi) {
+  const bottle = new Bottle();
+
+  // Infrastructure - shared admin API client
+  bottle.value("adminApi", admin);
+
+  // Validators - singletons (stateless)
+  bottle.service("CustomerValidator", CustomerValidator);
+  bottle.service("SampleValidator", SampleValidator);
+
+  // Repositories - request-scoped (need adminApi)
+  bottle.factory(
+    "CustomerRepository",
+    (container) => new CustomerRepository(container.adminApi),
+  );
+
+  // Services - orchestrate repository + validator
+  bottle.factory(
+    "CustomerService",
+    (container) =>
+      new HcpCustomerService(
+        container.CustomerRepository,
+        container.CustomerValidator,
+      ),
+  );
+
+  return bottle.container;
+}
+```
+
+| Pattern            | Method          | Use Case                  |
+| ------------------ | --------------- | ------------------------- |
+| `bottle.value()`   | Shared instance | Infrastructure (adminApi) |
+| `bottle.service()` | Singleton       | Stateless validators      |
+| `bottle.factory()` | New instance    | Classes with dependencies |
+
+### Layer Responsibilities
+
+| Layer          | File                                  | Responsibility                        |
+| -------------- | ------------------------------------- | ------------------------------------- |
+| **Route**      | `routes/hcp.customer.tsx`             | HTTP handling, auth, DI orchestration |
+| **Service**    | `services/hcp-customer/service.ts`    | Business logic orchestration          |
+| **Repository** | `services/hcp-customer/repository.ts` | Data access (GraphQL)                 |
+| **Validator**  | `services/hcp-customer/validator.ts`  | Input validation                      |
+
+### Service Layer Example
+
+```typescript
+// app/services/hcp-customer/service.ts
+export class HcpCustomerService {
+  constructor(
+    private repo: CustomerRepository,
+    private validator: CustomerValidator,
+  ) {}
+
+  async createCustomer(formData: FormData) {
+    // 1. Parse form data to DTO
+    const dto = CustomerFormParser.fromFormData(formData);
+
+    // 2. Validate input (throws ValidationError on failure)
+    this.validator.validate(dto);
+
+    // 3. Check for duplicates
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ValidationError([...]);
+
+    // 4. Create customer
+    const customer = await this.repo.create(dto);
+    return { customer, message: "HCP customer created successfully" };
+  }
+}
+```
+
+### Zod Validation
+
+```typescript
+// app/services/hcp-customer/validator.ts
+export const CreateCustomerSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email(),
+  specialty: z.string().min(1).max(100),
+  credentials: z.string().min(1).max(50),
+  licenseNpi: z
+    .string()
+    .regex(/^\d{10}$/, "NPI must be 10 digits")
+    .optional()
+    .default(""),
+  institutionName: z.string().min(1).max(200),
+  businessAddress: z.string().min(1).max(255),
+  addressLine2: z.string().max(255).optional().default(""),
+  city: z.string().min(1).max(100),
+  state: z.string().min(2).max(50),
+  zipCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code format"),
+  country: z.string().length(2).default("US"),
+});
+
+export class CustomerValidator {
+  validate(data: unknown): ValidatedCustomerInput {
+    const result = CreateCustomerSchema.safeParse(data);
+    if (!result.success) {
+      const errors = result.error.issues.map((err) => ({
+        field: err.path.join("."),
+        message: err.message,
+      }));
+      throw new ValidationError(errors);
+    }
+    return result.data;
+  }
+}
+```
+
+### GraphQL Operations
+
+The repository handles all Shopify Admin API interactions:
+
+```typescript
+// app/services/hcp-customer/repository.ts
+async findByEmail(email: string): Promise<Customer | null> {
+  const query = await this.admin.graphql(
+    `query customerByEmail($email: String!) {
+      customers(first: 1, query: $email) {
+        edges {
+          node {
+            id, email, firstName, lastName, tags
+          }
+        }
+      }
+    }`,
+    { variables: { email: `email:${email}` } }
+  );
+  return result.data?.customers?.edges[0]?.node || null;
+}
+
+async create(dto: CustomerDTO): Promise<Customer> {
+  const mutation = await this.admin.graphql(
+    `mutation customerCreate($input: CustomerInput!) {
+      customerCreate(input: $input) {
+        customer { id, email, firstName, lastName, tags }
+        userErrors { field, message }
+      }
+    }`,
+    {
+      variables: {
+        input: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email: dto.email,
+          tags: dto.tags,
+          addresses: [{ /* address fields */ }],
+          metafields: [
+            { namespace: "hcp", key: "speciality", value: dto.specialty, type: "single_line_text_field" },
+            { namespace: "hcp", key: "credentials", value: dto.credentials, type: "single_line_text_field" },
+            { namespace: "hcp", key: "license", value: dto.licenseNpi, type: "single_line_text_field" },
+          ],
+        },
+      },
+    }
+  );
+  return result.data?.customerCreate?.customer;
+}
+```
+
+### Error Handling
+
+| Error                   | File                     | Status  | Use Case                               |
+| ----------------------- | ------------------------ | ------- | -------------------------------------- |
+| `ValidationError`       | `shared/errors.ts`       | 400     | Zod validation failures                |
+| `GraphQLError`          | `hcp-customer/errors.ts` | 500/400 | GraphQL HTTP/network errors            |
+| `CustomerCreationError` | `hcp-customer/errors.ts` | 422     | Shopify validation errors (userErrors) |
+
+**Route Error Handling:**
+
+```typescript
+try {
+  const result = await CustomerService.createCustomer(formData);
+  return jsonResponse(result);
+} catch (error) {
+  if (error instanceof ValidationError) {
+    return jsonResponse({ errors: error.errors }, error.statusCode);
+  }
+  if (error instanceof CustomerCreationError) {
+    return jsonResponse(
+      { status: "error", code: error.statusCode, errors: error.errors },
+      error.statusCode,
+    );
+  }
+  if (error instanceof GraphQLError) {
+    return jsonResponse(
+      {
+        status: "error",
+        code: error.statusCode,
+        error: error.message,
+        graphqlErrors: error.graphqlErrors,
+      },
+      error.statusCode,
+    );
+  }
+  console.error("Unexpected error:", error);
+  return jsonResponse({ error: "Internal server error" }, 500);
+}
+```
+
+### Adding a New Service
+
+1. **Create service directory** in `app/services/`:
+
+   ```
+   app/services/new-feature/
+   ├── constants.ts
+   ├── dto.ts
+   ├── errors.ts
+   ├── repository.ts
+   ├── service.ts
+   ├── types.ts
+   └── validator.ts
+   ```
+
+2. **Register in DI container** (`app/container/index.ts`):
+
+   ```typescript
+   bottle.factory(
+     "NewFeatureService",
+     (container) =>
+       new NewFeatureService(
+         container.NewFeatureRepository,
+         container.NewFeatureValidator,
+       ),
+   );
+   ```
+
+3. **Use in route**:
+
+   ```typescript
+   const { NewFeatureService } = createContainer(admin);
+   const result = await NewFeatureService.doSomething(data);
+   ```
+
+---
+
+## Setup & Development
+
+### Prerequisites
+
+- Node.js 20+
+- Cloudflare account
+- Shopify Partner account
+
+### Environment Variables
+
+Create a `.env` file:
+
+```bash
+# Local development (Node.js)
+SHOPIFY_API_KEY=...
+SHOPIFY_API_SECRET=...
+SHOPIFY_APP_URL=http://localhost:3000
+SCOPES=read_products,write_products
+```
+
+### Commands
+
+```bash
+# Start local dev server (Node.js)
+npm run dev
+
+# Build for production (Cloudflare)
+npm run build:worker
+
+# Deploy to Cloudflare Workers
+npm run deploy
+
+# Open Prisma Studio (local)
+npm run prisma studio
+```
+
+---
 
 ## Deployment
 
-### Application Storage
+### Wrangler Configuration
 
-This template uses [Prisma](https://www.prisma.io/) to store session data, by default using an [SQLite](https://www.sqlite.org/index.html) database.
-The database is defined as a Prisma schema in `prisma/schema.prisma`.
+`wrangler.toml` defines the Cloudflare infrastructure:
 
-This use of SQLite works in production if your app runs as a single instance.
-The database that works best for you depends on the data your app needs and how it is queried.
-Here’s a short list of databases providers that provide a free tier to get started:
+```toml
+name = "your-app"
+main = "./build/server/index.js"
+compatibility_date = "2025-08-05"
 
-| Database   | Type             | Hosters                                                                                                                                                                                                                               |
-| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MySQL      | SQL              | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-mysql), [Planet Scale](https://planetscale.com/), [Amazon Aurora](https://aws.amazon.com/rds/aurora/), [Google Cloud SQL](https://cloud.google.com/sql/docs/mysql) |
-| PostgreSQL | SQL              | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-postgresql), [Amazon Aurora](https://aws.amazon.com/rds/aurora/), [Google Cloud SQL](https://cloud.google.com/sql/docs/postgres)                                   |
-| Redis      | Key-value        | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-redis), [Amazon MemoryDB](https://aws.amazon.com/memorydb/)                                                                                                        |
-| MongoDB    | NoSQL / Document | [Digital Ocean](https://www.digitalocean.com/products/managed-databases-mongodb), [MongoDB Atlas](https://www.mongodb.com/atlas/database)                                                                                                  |
-
-To use one of these, you can use a different [datasource provider](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#datasource) in your `schema.prisma` file, or a different [SessionStorage adapter package](https://github.com/Shopify/shopify-api-js/blob/main/packages/shopify-api/docs/guides/session-storage.md).
-
-### Build
-
-Build the app by running the command below with the package manager of your choice:
-
-Using yarn:
-
-```shell
-yarn build
+[[d1_databases]]
+binding = "DB"
+database_name = "your-app-db"
+database_id = "your-d1-id"
 ```
 
-Using npm:
+### Required Secrets
 
-```shell
-npm run build
+Set these in Cloudflare Dashboard or via wrangler:
+
+```bash
+npx wrangler secret put SHOPIFY_API_KEY
+npx wrangler secret put SHOPIFY_API_SECRET
+npx wrangler secret put SCOPES
+npx wrangler secret put SESSION_SECRET
 ```
 
-Using pnpm:
+### Database Migrations
 
-```shell
-pnpm run build
+After deploying, run migrations on your D1 database:
+
+```bash
+npx wrangler d1 execute your-db --remote --file=./prisma/migrations/latest.sql
 ```
 
-## Hosting
+---
 
-When you're ready to set up your app in production, you can follow [our deployment documentation](https://shopify.dev/docs/apps/launch/deployment) to host it externally. From there, you have a few options:
+## Common Patterns
 
-- [Google Cloud Run](https://shopify.dev/docs/apps/launch/deployment/deploy-to-google-cloud-run): This tutorial is written specifically for this example repo, and is compatible with the extended steps included in the subsequent [**Build your app**](tutorial) in the **Getting started** docs. It is the most detailed tutorial for taking a React Router-based Shopify app and deploying it to production. It includes configuring permissions and secrets, setting up a production database, and even hosting your apps behind a load balancer across multiple regions. 
-- [Fly.io](https://fly.io/docs/js/shopify/): Leverages the Fly.io CLI to quickly launch Shopify apps to a single machine. 
-- [Render](https://render.com/docs/deploy-shopify-app): This tutorial guides you through using Docker to deploy and install apps on a Dev store. 
-- [Manual deployment guide](https://shopify.dev/docs/apps/launch/deployment/deploy-to-hosting-service): This resource provides general guidance on the requirements of deployment including environment variables, secrets, and persistent data. 
+### Adding New Environment Variables
 
-When you reach the step for [setting up environment variables](https://shopify.dev/docs/apps/deployment/web#set-env-vars), you also need to set the variable `NODE_ENV=production`.
+1.  **Add to `wrangler.toml`**:
 
-## Gotchas / Troubleshooting
+    ```toml
+    [vars]
+    NEW_FEATURE_FLAG = true
+    ```
 
-### Database tables don't exist
+2.  **Add to `app/shopify.server.worker.ts`**:
 
-If you get an error like:
+    ```typescript
+    export interface ShopifyEnv {
+      // ... existing fields
+      NEW_FEATURE_FLAG?: string;
+    }
+    ```
 
-```
-The table `main.Session` does not exist in the current database.
-```
+3.  **Use in request**:
+    ```typescript
+    export function initShopify(env: ShopifyEnv) {
+      if (env.NEW_FEATURE_FLAG) { ... }
+    }
+    ```
 
-Create the database for Prisma. Run the `setup` script in `package.json` using `npm`, `yarn` or `pnpm`.
+### Adding Database Tables
 
-### Navigating/redirecting breaks an embedded app
+1.  **Edit `prisma/schema.prisma`**:
 
-Embedded apps must maintain the user session, which can be tricky inside an iFrame. To avoid issues:
+    ```prisma
+    model MyTable {
+      id String @id
+      createdAt DateTime @default(now())
+    }
+    ```
 
-1. Use `Link` from `react-router` or `@shopify/polaris`. Do not use `<a>`.
-2. Use `redirect` returned from `authenticate.admin`. Do not use `redirect` from `react-router`
-3. Use `useSubmit` from `react-router`.
+2.  **Generate migration**:
 
-This only applies if your app is embedded, which it will be by default.
+    ```bash
+    npx prisma migrate dev --name add_my_table
+    ```
 
-### Webhooks: shop-specific webhook subscriptions aren't updated
+3.  **Deploy migration**:
+    ```bash
+    npx wrangler d1 execute your-db --remote --file=./prisma/migrations/YYYYMMDDHHMMSS_add_my_table.sql
+    ```
 
-If you are registering webhooks in the `afterAuth` hook, using `shopify.registerWebhooks`, you may find that your subscriptions aren't being updated.  
-
-Instead of using the `afterAuth` hook declare app-specific webhooks in the `shopify.app.toml` file.  This approach is easier since Shopify will automatically sync changes every time you run `deploy` (e.g: `npm run deploy`).  Please read these guides to understand more:
-
-1. [app-specific vs shop-specific webhooks](https://shopify.dev/docs/apps/build/webhooks/subscribe#app-specific-subscriptions)
-2. [Create a subscription tutorial](https://shopify.dev/docs/apps/build/webhooks/subscribe/get-started?deliveryMethod=https)
-
-If you do need shop-specific webhooks, keep in mind that the package calls `afterAuth` in 2 scenarios:
-
-- After installing the app
-- When an access token expires
-
-During normal development, the app won't need to re-authenticate most of the time, so shop-specific subscriptions aren't updated. To force your app to update the subscriptions, uninstall and reinstall the app. Revisiting the app will call the `afterAuth` hook.
-
-### Webhooks: Admin created webhook failing HMAC validation
-
-Webhooks subscriptions created in the [Shopify admin](https://help.shopify.com/en/manual/orders/notifications/webhooks) will fail HMAC validation. This is because the webhook payload is not signed with your app's secret key.  
-
-The recommended solution is to use [app-specific webhooks](https://shopify.dev/docs/apps/build/webhooks/subscribe#app-specific-subscriptions) defined in your toml file instead.  Test your webhooks by triggering events manually in the Shopify admin(e.g. Updating the product title to trigger a `PRODUCTS_UPDATE`).
-
-### Webhooks: Admin object undefined on webhook events triggered by the CLI
-
-When you trigger a webhook event using the Shopify CLI, the `admin` object will be `undefined`. This is because the CLI triggers an event with a valid, but non-existent, shop. The `admin` object is only available when the webhook is triggered by a shop that has installed the app.  This is expected.
-
-Webhooks triggered by the CLI are intended for initial experimentation testing of your webhook configuration. For more information on how to test your webhooks, see the [Shopify CLI documentation](https://shopify.dev/docs/apps/tools/cli/commands#webhook-trigger).
-
-### Incorrect GraphQL Hints
-
-By default the [graphql.vscode-graphql](https://marketplace.visualstudio.com/items?itemName=GraphQL.vscode-graphql) extension for will assume that GraphQL queries or mutations are for the [Shopify Admin API](https://shopify.dev/docs/api/admin). This is a sensible default, but it may not be true if:
-
-1. You use another Shopify API such as the storefront API.
-2. You use a third party GraphQL API.
-
-If so, please update [.graphqlrc.ts](https://github.com/Shopify/shopify-app-template-react-router/blob/main/.graphqlrc.ts).
-
-### Using Defer & await for streaming responses
-
-By default the CLI uses a cloudflare tunnel. Unfortunately  cloudflare tunnels wait for the Response stream to finish, then sends one chunk.  This will not affect production.
-
-To test [streaming using await](https://reactrouter.com/api/components/Await#await) during local development we recommend [localhost based development](https://shopify.dev/docs/apps/build/cli-for-apps/networking-options#localhost-based-development).
-
-### "nbf" claim timestamp check failed
-
-This is because a JWT token is expired.  If you  are consistently getting this error, it could be that the clock on your machine is not in sync with the server.  To fix this ensure you have enabled "Set time and date automatically" in the "Date and Time" settings on your computer.
-
-### Using MongoDB and Prisma
-
-If you choose to use MongoDB with Prisma, there are some gotchas in Prisma's MongoDB support to be aware of. Please see the [Prisma SessionStorage README](https://www.npmjs.com/package/@shopify/shopify-app-session-storage-prisma#mongodb).
-
-### Unable to require(`C:\...\query_engine-windows.dll.node`).
-
-Unable to require(`C:\...\query_engine-windows.dll.node`).
-  The Prisma engines do not seem to be compatible with your system.
-
-  query_engine-windows.dll.node is not a valid Win32 application.
-
-**Fix:** Set the environment variable:
-```shell
-PRISMA_CLIENT_ENGINE_TYPE=binary
-```
-
-This forces Prisma to use the binary engine mode, which runs the query engine as a separate process and can work via emulation on Windows ARM64.
+---
 
 ## Resources
 
-React Router:
-
-- [React Router docs](https://reactrouter.com/home)
-
-Shopify:
-
-- [Intro to Shopify apps](https://shopify.dev/docs/apps/getting-started)
-- [Shopify App React Router docs](https://shopify.dev/docs/api/shopify-app-react-router)
-- [Shopify CLI](https://shopify.dev/docs/apps/tools/cli)
-- [Shopify App Bridge](https://shopify.dev/docs/api/app-bridge-library).
-- [Polaris Web Components](https://shopify.dev/docs/api/app-home/polaris-web-components).
-- [App extensions](https://shopify.dev/docs/apps/app-extensions/list)
-- [Shopify Functions](https://shopify.dev/docs/api/functions)
-
-Internationalization:
-
-- [Internationalizing your app](https://shopify.dev/docs/apps/best-practices/internationalization/getting-started)
+- [React Router v7 Docs](https://reactrouter.com/)
+- [Shopify App React Router](https://shopify.dev/docs/api/shopify-app-react-router)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
+- [Prisma with D1](https://www.prisma.io/docs/orm/overview/databases/cloudflare-d1)

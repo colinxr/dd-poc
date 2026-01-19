@@ -35,12 +35,6 @@ describe("hcp.customer route action", () => {
       body: formData,
     });
 
-    // Mock findByEmail (not found)
-    mockAdmin.graphql.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ data: { customers: { edges: [] } } }),
-    });
-
     // Mock create
     mockAdmin.graphql.mockResolvedValueOnce({
       ok: true,
@@ -75,36 +69,5 @@ describe("hcp.customer route action", () => {
 
     expect(response.status).toBe(400);
     expect(result.errors).toBeDefined();
-  });
-
-  it("should return 409 when customer already exists", async () => {
-    const formData = createFormData(MOCK_CUSTOMER_DATA);
-    const request = new Request("https://test.com/hcp/customer", {
-      method: "POST",
-      body: formData,
-    });
-
-    // Mock findByEmail (found)
-    mockAdmin.graphql.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: {
-          customers: {
-            edges: [
-              {
-                node: { id: "gid://existing", email: MOCK_CUSTOMER_DATA.email },
-              },
-            ],
-          },
-        },
-      }),
-    });
-
-    const response = await action({ request, params: {}, context: {} } as any);
-    const result = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(result.error).toContain("already exists");
-    expect(result.existingCustomerId).toBe("gid://existing");
   });
 });

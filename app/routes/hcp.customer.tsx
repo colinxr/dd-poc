@@ -5,7 +5,6 @@ import { jsonResponse, CORS_HEADERS } from "../services/shared/api";
 import { authenticateAppProxy } from "../services/shared/app-proxy";
 import {
   CustomerCreationError,
-  CustomerAlreadyExistsError,
   GraphQLError,
 } from "../services/hcp-customer/errors";
 import { CustomerValidator } from "../services/hcp-customer/validator";
@@ -42,16 +41,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           status: "error",
           code: error.statusCode,
           errors: error.errors,
-        },
-        error.statusCode,
-      );
-    }
-
-    if (error instanceof CustomerAlreadyExistsError) {
-      return jsonResponse(
-        {
-          error: error.message,
-          existingCustomerId: error.existingCustomerId,
         },
         error.statusCode,
       );

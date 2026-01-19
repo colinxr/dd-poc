@@ -1,10 +1,6 @@
 import { HCP_CUSTOMER_TAG } from "./constants";
 import type { Customer, CustomerDTO } from "./types";
-import {
-  GraphQLError,
-  CustomerCreationError,
-  CustomerAlreadyExistsError,
-} from "./errors";
+import { GraphQLError, CustomerCreationError } from "./errors";
 
 interface AdminApi {
   graphql: (
@@ -15,65 +11,6 @@ interface AdminApi {
 
 export class CustomerRepository {
   constructor(private admin: AdminApi) {}
-
-  async findByEmail(email: string): Promise<Customer | null> {
-    try {
-      const query = await this.admin.graphql(
-        `query customerByEmail($email: String!) {
-          customers(first: 1, query: $email) {
-            edges {
-              node {
-                id
-                email
-                firstName
-                lastName
-                tags
-              }
-            }
-          }
-        }`,
-        { variables: { email: `email:${email}` } },
-      );
-
-      if (!query.ok) {
-        const errorText = await query.text();
-        console.error("GraphQL query failed:", {
-          status: query.status,
-          statusText: query.statusText,
-          body: errorText,
-        });
-        throw new GraphQLError(
-          "Failed to query customers",
-          query.status,
-          undefined,
-          [{ message: errorText }],
-        );
-      }
-
-      const result = await query.json();
-      if (result.errors) {
-        console.error(
-          "GraphQL errors in response:",
-          JSON.stringify(result.errors, null, 2),
-        );
-        throw new GraphQLError(
-          "GraphQL query failed",
-          400,
-          undefined,
-          result.errors,
-        );
-      }
-      return result.data?.customers?.edges[0]?.node || null;
-    } catch (error) {
-      if (error instanceof GraphQLError) throw error;
-      console.error("Unexpected error in findByEmail:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new GraphQLError("Failed to fetch customer by email", 500, error, [
-        { message: errorMessage },
-      ]);
-    }
-  }
 
   async create(dto: CustomerDTO): Promise<Customer> {
     try {
