@@ -1,13 +1,14 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import { createContainer } from "../container";
 import { ValidationError } from "../services/shared/errors";
 import { jsonResponse, CORS_HEADERS } from "../services/shared/api";
+import { authenticateAppProxy } from "../services/shared/app-proxy";
 import {
   DraftOrderCreationError,
   ProductNotFoundError,
   GraphQLError,
 } from "../services/hcp-samples/repository";
+import { SampleValidator } from "../services/hcp-samples/validator";
 
 export const loader = async () => {
   return new Response(null, { headers: CORS_HEADERS });
@@ -15,23 +16,16 @@ export const loader = async () => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const { admin } = await authenticate.public.appProxy(request);
+    const authResult = await authenticateAppProxy(request);
+    if (authResult instanceof Response) return authResult;
 
-    if (!admin) {
-      console.error("App proxy authentication failed - no admin context");
-      return jsonResponse(
-        {
-          error: "Authentication failed",
-          message: "Unable to authenticate app proxy request",
-        },
-        401,
-      );
-    }
-
-    const { SamplesService } = createContainer(admin);
+    const { admin } = authResult;
+    const { SamplesService, SampleValidator } = createContainer(admin);
 
     const formData = await request.formData();
-    const result = await SamplesService.createSampleRequest(formData);
+    const validated = SampleValidator.validateFormData(formData);
+
+    const result = await SamplesService.createSampleRequest(validated);
 
     return jsonResponse(result);
   } catch (error) {

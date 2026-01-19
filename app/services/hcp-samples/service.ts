@@ -1,18 +1,13 @@
 import { SampleRepository } from "./repository";
-import { SampleValidator } from "./validator";
-import { SampleFormParser } from "./dto";
+import type { ValidatedSampleInput } from "./validator";
 
 export class HcpSamplesService {
-  constructor(
-    private repo: SampleRepository,
-    private validator: SampleValidator,
-  ) {}
+  constructor(private repo: SampleRepository) {}
 
-  async createSampleRequest(formData: FormData): Promise<{ draftOrderId: string; orderNumber: string; message: string }> {
-    const dto = SampleFormParser.fromFormData(formData);
-    const validatedData = this.validator.validate(dto);
-
-    const draftOrder = await this.repo.createDraftOrder(validatedData);
+  async createSampleRequest(
+    dto: ValidatedSampleInput,
+  ): Promise<{ draftOrderId: string; orderNumber: string; message: string }> {
+    const draftOrder = await this.repo.createDraftOrder(dto);
 
     return {
       draftOrderId: draftOrder.id,
