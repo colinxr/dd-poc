@@ -38,20 +38,12 @@ export function createContainer(admin: AdminApi) {
   // Services
   bottle.factory(
     "CustomerService",
-    (container) =>
-      new HcpCustomerService(
-        container.CustomerRepository,
-        container.CustomerValidator,
-      ),
+    (container) => new HcpCustomerService(container.CustomerRepository),
   );
 
   bottle.factory(
     "SamplesService",
-    (container) =>
-      new HcpSamplesService(
-        container.SampleRepository,
-        container.SampleValidator,
-      ),
+    (container) => new HcpSamplesService(container.SampleRepository),
   );
 
   return bottle.container;

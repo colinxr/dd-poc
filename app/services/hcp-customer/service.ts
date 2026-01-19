@@ -1,31 +1,17 @@
 // Services
 import { CustomerRepository } from "./repository";
-import { CustomerValidator } from "./validator";
-import { CustomerFormParser } from "./dto";
-import { ValidationError } from "../shared/errors";
+import type { CustomerDTO } from "./types";
+import { CustomerAlreadyExistsError } from "./errors";
 
 export class HcpCustomerService {
-  constructor(
-    private repo: CustomerRepository,
-    private validator: CustomerValidator,
-  ) {}
+  constructor(private repo: CustomerRepository) {}
 
   async createCustomer(
-    formData: FormData,
+    dto: CustomerDTO,
   ): Promise<{ customer: unknown; message: string }> {
-    const dto = CustomerFormParser.fromFormData(formData);
-
-    this.validator.validate(dto);
-
-    console.log(dto);
     const existing = await this.repo.findByEmail(dto.email);
     if (existing) {
-      throw new ValidationError([
-        {
-          field: "email",
-          message: "A customer with this email already exists",
-        },
-      ]);
+      throw new CustomerAlreadyExistsError(existing.id);
     }
 
     const customer = await this.repo.create(dto);

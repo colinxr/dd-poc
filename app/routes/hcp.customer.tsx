@@ -1,9 +1,15 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate, unauthenticated } from "../shopify.server";
 import { createContainer } from "../container";
 import { ValidationError } from "../services/shared/errors";
 import { jsonResponse, CORS_HEADERS } from "../services/shared/api";
-import { CustomerCreationError, GraphQLError } from "../services/hcp-customer/errors";
+import { authenticateAppProxy } from "../services/shared/app-proxy";
+import {
+  CustomerCreationError,
+  CustomerAlreadyExistsError,
+  GraphQLError,
+} from "../services/hcp-customer/errors";
+import { CustomerValidator } from "../services/hcp-customer/validator";
+import { createCustomerDTO } from "../services/hcp-customer/types";
 
 export const loader = async () => {
   return new Response(null, { headers: CORS_HEADERS });
@@ -11,46 +17,18 @@ export const loader = async () => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const context = await authenticate.public.appProxy(request);
+    const authResult = await authenticateAppProxy(request);
+    if (authResult instanceof Response) return authResult;
 
-    if (!context.session?.shop) {
-      console.error("App proxy authentication failed - no shop in session");
-      return jsonResponse(
-        {
-          error: "Authentication failed",
-          message: "Unable to authenticate app proxy request",
-        },
-        401,
-      );
-    }
-
-    const shop = context.session.shop;
-
-    // App proxy requests don't include an access token, so we need to fetch
-    // the offline session for this shop to make Admin API calls
-    let admin;
-    try {
-      const result = await unauthenticated.admin(shop);
-      admin = result.admin;
-    } catch (sessionError) {
-      console.error(
-        "Failed to get admin session for shop:",
-        shop,
-        sessionError,
-      );
-      return jsonResponse(
-        {
-          error: "Session not found",
-          message: `No offline session found for shop: ${shop}. The app may need to be reinstalled.`,
-        },
-        401,
-      );
-    }
-
-    const { CustomerService } = createContainer(admin);
+    const { CustomerService, CustomerValidator } = createContainer(
+      authResult.admin,
+    );
 
     const formData = await request.formData();
-    const result = await CustomerService.createCustomer(formData);
+    const validated = CustomerValidator.validateFormData(formData);
+    const customerDto = createCustomerDTO(validated);
+
+    const result = await CustomerService.createCustomer(customerDto);
 
     return jsonResponse(result);
   } catch (error) {
@@ -64,6 +42,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           status: "error",
           code: error.statusCode,
           errors: error.errors,
+        },
+        error.statusCode,
+      );
+    }
+
+    if (error instanceof CustomerAlreadyExistsError) {
+      return jsonResponse(
+        {
+          error: error.message,
+          existingCustomerId: error.existingCustomerId,
         },
         error.statusCode,
       );
