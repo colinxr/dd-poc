@@ -34,3 +34,9 @@ export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
+
+// This is a no-op in the Node environment, but required by the worker entry point
+// to satisfy type checking when importing from "~/shopify.server"
+export function initShopify(env: any) {
+  // No-op
+}
