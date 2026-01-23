@@ -22,8 +22,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { admin } = authResult;
     const { SamplesService, SampleValidator } = createContainer(admin);
 
+    const url = new URL(request.url);
+    const formType = url.searchParams.get("type") || undefined;
+
     const formData = await request.formData();
-    const validated = SampleValidator.validateFormData(formData);
+    const validated = SampleValidator.validateFormData(formData, formType);
 
     const result = await SamplesService.createSampleRequest(validated);
 

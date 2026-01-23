@@ -78,4 +78,52 @@ describe("hcp.samples route action", () => {
     expect(response.status).toBe(400);
     expect(result.errors).toBeDefined();
   });
+
+  it("should succeed for direct-to-patient request with patientEmail", async () => {
+    const patientData = { ...MOCK_SAMPLE_DATA, patient_email: "patient@example.com" };
+    const formData = createFormData(patientData);
+    const request = new Request("https://test.com/hcp/samples?type=patient", {
+      method: "POST",
+      body: formData,
+    });
+
+    mockAdmin.graphql
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { product: { variants: { edges: [{ node: { id: "v1" } }] } } },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            draftOrderCreate: {
+              draftOrder: { id: "d1", name: "#1001" },
+              userErrors: [],
+            },
+          },
+        }),
+      });
+
+    const response = await action({ request, params: {}, context: {} } as any);
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result.draftOrderId).toBe("d1");
+  });
+
+  it("should return 400 for direct-to-patient request without patientEmail", async () => {
+    const formData = createFormData(MOCK_SAMPLE_DATA); // No patient_email
+    const request = new Request("https://test.com/hcp/samples?type=patient", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await action({ request, params: {}, context: {} } as any);
+    const result = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(result.errors.some((e: any) => e.field === "patient_email")).toBe(true);
+  });
 });

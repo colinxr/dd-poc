@@ -58,5 +58,46 @@ describe('SampleRepository', () => {
       expect(result.id).toBe('d1');
       expect(result.name).toBe('#1001');
     });
+
+    it('should include patient_email metafield when patientEmail is provided', async () => {
+      mockAdmin.graphql
+        .mockResolvedValueOnce({ // getProductVariant
+          ok: true,
+          json: async () => ({
+            data: { product: { variants: { edges: [{ node: { id: 'v1' } }] } } }
+          })
+        })
+        .mockResolvedValueOnce({ // draftOrderCreate
+          ok: true,
+          json: async () => ({
+            data: {
+              draftOrderCreate: {
+                draftOrder: { id: 'd1', name: '#1001' },
+                userErrors: []
+              }
+            }
+          })
+        });
+
+      const dto: any = {
+        productId: '123',
+        email: 'hcp@example.com',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        patientEmail: 'patient@example.com'
+      };
+
+      await repository.createDraftOrder(dto);
+
+      const draftOrderCall = mockAdmin.graphql.mock.calls[1];
+      const variables = draftOrderCall[1].variables;
+
+      expect(variables.input.metafields).toContainEqual({
+        namespace: 'custom',
+        key: 'patient_email',
+        type: 'single_line_text_field',
+        value: 'patient@example.com'
+      });
+    });
   });
 });

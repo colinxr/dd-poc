@@ -103,6 +103,16 @@ export class SampleRepository {
               },
               useCustomerDefaultAddress: false,
               note: `HCP Sample Request - ${dto.firstName} ${dto.lastName} - ${dto.email}`,
+              metafields: dto.patientEmail
+                ? [
+                    {
+                      namespace: "custom",
+                      key: "patient_email",
+                      type: "single_line_text_field",
+                      value: dto.patientEmail,
+                    },
+                  ]
+                : [],
             },
           },
         },
