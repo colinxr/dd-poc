@@ -10,6 +10,7 @@ export interface SampleDTO {
   country: string;
   zip: string;
   productId: string;
+  patientEmail?: string;
 }
 
 export interface ValidationError {

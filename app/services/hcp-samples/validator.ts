@@ -14,12 +14,14 @@ const RawFormDataSchema = z.object({
   country: z.string().optional().default(""),
   zip: z.string().optional().default(""),
   product: z.string().optional().default(""),
+  patient_email: z.string().optional().default(""),
 });
 
 export const SampleSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
+  patientEmail: z.string().email().optional(),
   phone: z
     .string()
     .regex(/^\+?[\d\s-()]{10,}$/, "Invalid phone number format")
@@ -49,7 +51,7 @@ export class SampleValidator {
     return result.data;
   }
 
-  validateFormData(formData: FormData): ValidatedSampleInput {
+  validateFormData(formData: FormData, formType?: string): ValidatedSampleInput {
     const rawData: Record<string, string> = {};
     for (const [key, value] of formData.entries()) {
       rawData[key] = value.toString();
@@ -76,7 +78,14 @@ export class SampleValidator {
       country,
       zip,
       product,
+      patient_email,
     } = rawResult.data;
+
+    if (formType === "patient" && !patient_email) {
+      throw new ValidationError([
+        { field: "patient_email", message: "Patient email is required for direct-to-patient requests" },
+      ]);
+    }
 
     return this.validate({
       firstName: first_name,
@@ -90,6 +99,7 @@ export class SampleValidator {
       country,
       zip,
       productId: product,
+      patientEmail: patient_email || undefined,
     });
   }
 }
