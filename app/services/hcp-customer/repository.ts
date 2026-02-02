@@ -13,7 +13,9 @@ export class CustomerRepository {
   constructor(private admin: AdminApi) {}
 
   async create(dto: CustomerDTO): Promise<Customer> {
+    console.log("CustomerRepository.create: Starting customer creation");
     try {
+      console.log("CustomerRepository.create: Making GraphQL mutation");
       const mutation = await this.admin.graphql(
         `mutation customerCreate($input: CustomerInput!) {
           customerCreate(input: $input) {
@@ -74,6 +76,7 @@ export class CustomerRepository {
           },
         },
       );
+      console.log("CustomerRepository.create: GraphQL response status:", mutation.status);
 
       if (!mutation.ok) {
         const errorText = await mutation.text();
@@ -92,7 +95,7 @@ export class CustomerRepository {
 
       const result = await mutation.json();
 
-      console.log(result);
+      console.log("CustomerRepository.create: GraphQL result:", JSON.stringify(result, null, 2));
 
       if (result.errors) {
         console.error(

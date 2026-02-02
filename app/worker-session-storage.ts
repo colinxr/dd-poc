@@ -33,9 +33,12 @@ export class WorkerSessionStorage implements SessionStorage {
   }
 
   async loadSession(id: string): Promise<Session | undefined> {
+    console.log("WorkerSessionStorage: loadSession called with id:", id);
     const row = await this.prismaClient.session.findUnique({
       where: { id },
     });
+
+    console.log("WorkerSessionStorage: loadSession result:", row ? "found" : "not found");
 
     if (!row) {
       return undefined;
@@ -63,11 +66,14 @@ export class WorkerSessionStorage implements SessionStorage {
   }
 
   async findSessionsByShop(shop: string): Promise<Session[]> {
+    console.log("WorkerSessionStorage: findSessionsByShop called with shop:", shop);
     const sessions = await this.prismaClient.session.findMany({
       where: { shop },
       take: 25,
       orderBy: { expires: "desc" },
     });
+    
+    console.log("WorkerSessionStorage: findSessionsByShop result count:", sessions.length);
 
     return sessions.map((session) => this.rowToSession(session));
   }

@@ -1,5 +1,5 @@
 export class ValidationError extends Error {
-  public statusCode = 400;
+  public statusCode = 422;
 
   constructor(
     public errors: Array<{ field: string; message: string }>

@@ -19,42 +19,45 @@ export async function authenticateAppProxy(
   
   try {
     const context = await authenticate.public.appProxy(request);
-    console.log("authenticateAppProxy: Auth context:", context);
+    console.log("authenticateAppProxy: Auth context keys:", Object.keys(context));
+    console.log("authenticateAppProxy: Has session?:", !!context.session);
+    console.log("authenticateAppProxy: Has admin?:", !!context.admin);
 
     if (!context.session?.shop) {
       console.error("authenticateAppProxy: No shop in session");
       return jsonResponse(
         {
-          error: "Authentication failed",
-          message: "Unable to authenticate app proxy request - no shop in session",
+          error: "Authentication failed - no shop in session",
+        },
+        401,
+      );
+    }
+
+    if (!context.admin) {
+      console.error("authenticateAppProxy: No admin in context");
+      return jsonResponse(
+        {
+          error: "Authentication failed - no admin context",
         },
         401,
       );
     }
 
     const shop = context.session.shop;
-    console.log("authenticateAppProxy: Shop found:", shop);
-
-    console.log("authenticateAppProxy: Getting admin session");
-    const result = await unauthenticated.admin(shop);
-    console.log("authenticateAppProxy: Admin session created successfully");
+    console.log("authenticateAppProxy: Auth successful for shop:", shop);
     
     return {
       shop,
-      admin: result.admin,
+      admin: context.admin,
     };
   } catch (sessionError) {
-    console.error("authenticateAppProxy: Failed to get admin session:", sessionError);
-    console.error("authenticateAppProxy: Error details:", {
-      name: sessionError.name,
-      message: sessionError.message,
-      stack: sessionError.stack
-    });
+    console.error("authenticateAppProxy: Failed:", sessionError);
+    console.error("authenticateAppProxy: Error name:", sessionError.name);
+    console.error("authenticateAppProxy: Error message:", sessionError.message);
     
     return jsonResponse(
       {
-        error: "Session not found",
-        message: `No offline session found for shop. The app may need to be reinstalled.`,
+        error: `Authentication failed: ${sessionError.message}`,
       },
       401,
     );

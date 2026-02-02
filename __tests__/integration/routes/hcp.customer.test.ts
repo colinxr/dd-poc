@@ -24,6 +24,7 @@ describe("hcp.customer route action", () => {
     };
     (authenticate.public.appProxy as any).mockResolvedValue({
       session: { shop: "test-shop.myshopify.com" },
+      admin: mockAdmin,
     });
     (unauthenticated.admin as any).mockResolvedValue({ admin: mockAdmin });
   });
@@ -56,7 +57,7 @@ describe("hcp.customer route action", () => {
     expect(result.message).toBe("HCP customer created successfully");
   });
 
-  it("should return 400 on validation error", async () => {
+  it("should return 422 on validation error", async () => {
     const invalidData = { ...MOCK_CUSTOMER_DATA, email: "invalid" };
     const formData = createFormData(invalidData);
     const request = new Request("https://test.com/hcp/customer", {
@@ -67,7 +68,7 @@ describe("hcp.customer route action", () => {
     const response = await action({ request, params: {}, context: {} } as any);
     const result = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(result.errors).toBeDefined();
+    expect(response.status).toBe(422);
+    expect(result.error).toBeDefined();
   });
 });

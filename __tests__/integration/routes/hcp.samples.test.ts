@@ -24,6 +24,7 @@ describe("hcp.samples route action", () => {
     };
     (authenticate.public.appProxy as any).mockResolvedValue({
       session: { shop: "test-shop.myshopify.com" },
+      admin: mockAdmin,
     });
     (unauthenticated.admin as any).mockResolvedValue({ admin: mockAdmin });
   });
@@ -64,7 +65,7 @@ describe("hcp.samples route action", () => {
     expect(result.orderNumber).toBe("#1001");
   });
 
-  it("should return 400 on validation error", async () => {
+  it("should return 422 on validation error", async () => {
     const invalidData = { ...MOCK_SAMPLE_DATA, product: "" };
     const formData = createFormData(invalidData);
     const request = new Request("https://test.com/hcp/samples", {
@@ -75,7 +76,7 @@ describe("hcp.samples route action", () => {
     const response = await action({ request, params: {}, context: {} } as any);
     const result = await response.json();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
     expect(result.errors).toBeDefined();
   });
 
@@ -113,7 +114,7 @@ describe("hcp.samples route action", () => {
     expect(result.draftOrderId).toBe("d1");
   });
 
-  it("should return 400 for direct-to-patient request without patientEmail", async () => {
+  it("should return 422 for direct-to-patient request without patientEmail", async () => {
     const formData = createFormData(MOCK_SAMPLE_DATA); // No patient_email
     const request = new Request("https://test.com/hcp/samples?type=patient", {
       method: "POST",
@@ -123,7 +124,7 @@ describe("hcp.samples route action", () => {
     const response = await action({ request, params: {}, context: {} } as any);
     const result = await response.json();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
     expect(result.errors.some((e: any) => e.field === "patient_email")).toBe(true);
   });
 });
