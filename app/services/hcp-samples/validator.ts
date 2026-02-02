@@ -15,6 +15,7 @@ const RawFormDataSchema = z.object({
   zip: z.string().optional().default(""),
   product: z.string().optional().default(""),
   patient_email: z.string().optional().default(""),
+  patient_phone: z.string().optional().default(""),
 });
 
 export const SampleSchema = z.object({
@@ -22,6 +23,7 @@ export const SampleSchema = z.object({
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   patientEmail: z.string().email().optional(),
+  patientPhone: z.string().optional().default(""),
   phone: z
     .string()
     .regex(/^\+?[\d\s-()]{10,}$/, "Invalid phone number format")
@@ -79,6 +81,7 @@ export class SampleValidator {
       zip,
       product,
       patient_email,
+      patient_phone,
     } = rawResult.data;
 
     if (formType === "patient" && !patient_email) {
@@ -100,6 +103,7 @@ export class SampleValidator {
       zip,
       productId: product,
       patientEmail: patient_email || undefined,
+      patientPhone: patient_phone || undefined,
     });
   }
 }

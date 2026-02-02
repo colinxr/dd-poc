@@ -200,8 +200,8 @@ The app follows a **Repository + Validator + Service** pattern:
 
 ```
 Service Layer
-├── HcpCustomerService    # Orchestrates customer creation
-├── HcpSamplesService     # Orchestrates sample requests
+├── CustomerService    # Orchestrates customer creation
+├── SamplesService     # Orchestrates sample requests
 ├── CustomerValidator     # Zod validation for customer data
 ├── SampleValidator       # Zod validation for sample data
 ├── CustomerRepository    # GraphQL operations for customers

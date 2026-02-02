@@ -1,10 +1,10 @@
 import Bottle from "bottlejs";
 import { CustomerRepository } from "../services/hcp-customer/repository";
 import { CustomerValidator } from "../services/hcp-customer/validator";
-import { HcpCustomerService } from "../services/hcp-customer/service";
+import { CustomerService } from "../services/hcp-customer/service";
 import { SampleRepository } from "../services/hcp-samples/repository";
 import { SampleValidator } from "../services/hcp-samples/validator";
-import { HcpSamplesService } from "../services/hcp-samples/service";
+import { SamplesService } from "../services/hcp-samples/service";
 
 // Define the AdminApi interface locally to avoid circular dependencies if needed
 interface AdminApi {
@@ -38,12 +38,12 @@ export function createContainer(admin: AdminApi) {
   // Services
   bottle.factory(
     "CustomerService",
-    (container) => new HcpCustomerService(container.CustomerRepository),
+    (container) => new CustomerService(container.CustomerRepository),
   );
 
   bottle.factory(
     "SamplesService",
-    (container) => new HcpSamplesService(container.SampleRepository),
+    (container) => new SamplesService(container.SampleRepository),
   );
 
   return bottle.container;

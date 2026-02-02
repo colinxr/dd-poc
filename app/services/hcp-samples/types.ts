@@ -11,6 +11,7 @@ export interface SampleDTO {
   zip: string;
   productId: string;
   patientEmail?: string;
+  patientPhone?: string;
 }
 
 export interface ValidationError {

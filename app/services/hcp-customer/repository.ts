@@ -39,11 +39,11 @@ export class CustomerRepository {
               tags: dto.tags,
               addresses: [
                 {
-                  address1: dto.businessAddress,
-                  address2: dto.addressLine2,
+                  address1: dto.addressLine1,
+                  address2: dto.address2,
                   city: dto.city,
-                  provinceCode: dto.state,
-                  zip: dto.zipCode,
+                  provinceCode: dto.province,
+                  zip: dto.zip,
                   countryCode: dto.country,
                   company: dto.institutionName,
                   firstName: dto.firstName,

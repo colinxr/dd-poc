@@ -203,7 +203,7 @@ HTTP Request (POST /hcp/customer)
          |
          v
 ┌─────────────────────────────────────────────────────────────┐
-│ HcpCustomerService (app/services/hcp-customer/service.ts)    │
+│ CustomerService (app/services/hcp-customer/service.ts)    │
 │ 1. CustomerRepository.create(dto) - Create customer         │
 │    (Shopify mutation handles duplicate email validation)    │
 │ 2. Return { customer, message }                             │
@@ -244,7 +244,7 @@ export function createContainer(admin: AdminApi) {
   bottle.factory(
     "CustomerService",
     (container) =>
-      new HcpCustomerService(
+      new CustomerService(
         container.CustomerRepository,
         container.CustomerValidator,
       ),
@@ -273,7 +273,7 @@ export function createContainer(admin: AdminApi) {
 
 ```typescript
 // app/services/hcp-customer/service.ts
-export class HcpCustomerService {
+export class CustomerService {
   constructor(
     private repo: CustomerRepository,
     private validator: CustomerValidator,

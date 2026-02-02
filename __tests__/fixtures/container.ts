@@ -2,10 +2,10 @@ import Bottle from 'bottlejs';
 import { createMockAdminApi } from './mock-admin-api';
 import { CustomerRepository } from '../../app/services/hcp-customer/repository';
 import { CustomerValidator } from '../../app/services/hcp-customer/validator';
-import { HcpCustomerService } from '../../app/services/hcp-customer/service';
+import { CustomerService } from '../../app/services/hcp-customer/service';
 import { SampleRepository } from '../../app/services/hcp-samples/repository';
 import { SampleValidator } from '../../app/services/hcp-samples/validator';
-import { HcpSamplesService } from '../../app/services/hcp-samples/service';
+import { SamplesService } from '../../app/services/hcp-samples/service';
 
 export function createTestContainer() {
   const bottle = new Bottle();
@@ -27,15 +27,15 @@ export function createTestContainer() {
   });
 
   // Services
-  bottle.factory('HcpCustomerService', (container) => {
-    return new HcpCustomerService(
+  bottle.factory('CustomerService', (container) => {
+    return new CustomerService(
       container.CustomerRepository,
       container.CustomerValidator
     );
   });
 
-  bottle.factory('HcpSamplesService', (container) => {
-    return new HcpSamplesService(
+  bottle.factory('SamplesService', (container) => {
+    return new SamplesService(
       container.SampleRepository,
       container.SampleValidator
     );

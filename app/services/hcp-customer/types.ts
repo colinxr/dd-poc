@@ -8,12 +8,13 @@ export interface CreateCustomerInput {
   credentials: string;
   licenseNpi: string;
   institutionName: string;
-  businessAddress: string;
-  addressLine2: string;
+  address1: string;
+  address2: string;
   city: string;
-  state: string;
-  zipCode: string;
+  province: string;
+  zip: string;
   country: string;
+  phone: string;
 }
 
 export type CustomerDTO = CreateCustomerInput & {
@@ -30,22 +31,6 @@ export function createCustomerDTO(data: CreateCustomerInput): CustomerDTO {
 export interface ValidationError {
   field: string;
   message: string;
-}
-
-export interface CreateCustomerInput {
-  firstName: string;
-  lastName: string;
-  email: string;
-  specialty: string;
-  credentials: string;
-  licenseNpi: string;
-  institutionName: string;
-  businessAddress: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
 }
 
 export interface Customer {

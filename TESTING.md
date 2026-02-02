@@ -37,7 +37,7 @@ The main container is created in `app/container/index.ts`. It takes the Shopify 
 
 ```typescript
 const container = createContainer(admin);
-const service = container.HcpCustomerService;
+const service = container.CustomerService;
 ```
 
 ### Mocking in Tests

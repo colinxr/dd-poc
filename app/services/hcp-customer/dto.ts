@@ -10,11 +10,11 @@ export class CustomerFormParser {
       credentials: formData.get("credentials")?.toString() || "",
       licenseNpi: formData.get("license_npi")?.toString() || "",
       institutionName: formData.get("institution_name")?.toString() || "",
-      businessAddress: formData.get("business_address")?.toString() || "",
-      addressLine2: formData.get("address_line_2")?.toString() || "",
+      address1: formData.get("address1")?.toString() || "",
+      address2: formData.get("address2")?.toString() || "",
       city: formData.get("city")?.toString() || "",
-      state: formData.get("state")?.toString() || "",
-      zipCode: formData.get("zip_code")?.toString() || "",
+      province: formData.get("province")?.toString() || "",
+      zip: formData.get("zip")?.toString() || "",
       country: formData.get("country")?.toString() || "US",
     };
   }

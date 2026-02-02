@@ -1,7 +1,7 @@
 import { SampleRepository } from "./repository";
 import type { ValidatedSampleInput } from "./validator";
 
-export class HcpSamplesService {
+export class SamplesService {
   constructor(private repo: SampleRepository) {}
 
   async createSampleRequest(

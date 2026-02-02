@@ -10,12 +10,14 @@ const RawFormDataSchema = z.object({
   credentials: z.string().optional().default(""),
   license_npi: z.string().optional().default(""),
   institution_name: z.string().optional().default(""),
-  business_address: z.string().optional().default(""),
-  address_line_2: z.string().optional().default(""),
+  address1: z.string().optional().default(""),
+  address2: z.string().optional().default(""),
   city: z.string().optional().default(""),
-  state: z.string().optional().default(""),
-  zip_code: z.string().optional().default(""),
+  province: z.string().optional().default(""),
+  zip: z.string().optional().default(""),
   country: z.string().optional().default("US"),
+  country_code: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
 });
 
 export const CreateCustomerSchema = z.object({
@@ -30,12 +32,13 @@ export const CreateCustomerSchema = z.object({
     .optional()
     .default(""),
   institutionName: z.string().min(1).max(200),
-  businessAddress: z.string().min(1).max(255),
-  addressLine2: z.string().max(255).optional().default(""),
+  address1: z.string().min(1).max(255),
+  address2: z.string().max(255).optional().default(""),
   city: z.string().min(1).max(100),
-  state: z.string().min(2).max(50),
-  zipCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code format"),
+  province: z.string().min(2).max(50),
+  zip: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code format"),
   country: z.string().length(2).default("US"),
+  phone: z.string().optional().default(""),
 });
 
 export type ValidatedCustomerInput = z.infer<typeof CreateCustomerSchema>;
@@ -76,13 +79,16 @@ export class CustomerValidator {
       credentials,
       license_npi,
       institution_name,
-      business_address,
-      address_line_2,
-      city,
-      state,
-      zip_code,
+      address1,
+      address2,
+      province,
+      zip,
       country,
+      country_code,
+      phone,
     } = rawResult.data;
+
+    const phoneNumber = phone && country_code ? `${country_code}${phone}` : "";
 
     return this.validate({
       firstName: first_name,
@@ -92,12 +98,12 @@ export class CustomerValidator {
       credentials,
       licenseNpi: license_npi,
       institutionName: institution_name,
-      businessAddress: business_address,
-      addressLine2: address_line_2,
-      city,
-      state,
-      zipCode: zip_code,
+      address1: address1,
+      address2: address2,
+      province: province,
+      zip: zip,
       country,
+      phone: phoneNumber,
     });
   }
 }

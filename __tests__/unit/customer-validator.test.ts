@@ -23,11 +23,11 @@ describe('CustomerValidator', () => {
       credentials: MOCK_CUSTOMER_DATA.credentials,
       licenseNpi: MOCK_CUSTOMER_DATA.license_npi,
       institutionName: MOCK_CUSTOMER_DATA.institution_name,
-      businessAddress: MOCK_CUSTOMER_DATA.business_address,
-      addressLine2: MOCK_CUSTOMER_DATA.address_line_2,
+      address1: MOCK_CUSTOMER_DATA.address1,
+      address2: MOCK_CUSTOMER_DATA.address2,
       city: MOCK_CUSTOMER_DATA.city,
-      state: MOCK_CUSTOMER_DATA.state,
-      zipCode: MOCK_CUSTOMER_DATA.zip_code,
+      province: MOCK_CUSTOMER_DATA.province,
+      zip: MOCK_CUSTOMER_DATA.zip,
       country: MOCK_CUSTOMER_DATA.country,
     };
 

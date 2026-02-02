@@ -6,11 +6,11 @@ export const MOCK_CUSTOMER_DATA = {
   credentials: "MD",
   license_npi: "1234567890",
   institution_name: "Healthy Clinic",
-  business_address: "123 Health St",
-  address_line_2: "Suite 100",
+  address1: "123 Health St",
+  address2: "Suite 100",
   city: "Wellness",
-  state: "CA",
-  zip_code: "90210",
+  province: "CA",
+  zip: "90210",
   country: "US"
 };
 

@@ -1,7 +1,7 @@
 import { CustomerRepository } from "./repository";
 import type { CustomerDTO } from "./types";
 
-export class HcpCustomerService {
+export class CustomerService {
   constructor(private repo: CustomerRepository) {}
 
   async createCustomer(
