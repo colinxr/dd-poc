@@ -1,6 +1,7 @@
 import { HCP_CUSTOMER_TAG } from "./constants";
 import type { Customer, CustomerDTO } from "./types";
 import { GraphQLError, CustomerCreationError } from "./errors";
+import { m } from "node_modules/react-router/dist/development/index-react-server-client-IoJGLOqV.mjs";
 
 interface AdminApi {
   graphql: (
@@ -67,6 +68,12 @@ export class CustomerRepository {
                   namespace: "hcp",
                   key: "license",
                   value: dto.licenseNpi,
+                  type: "single_line_text_field",
+                },
+                {
+                  namespace: "hcp",
+                  key: "institution",
+                  value: dto.institutionName,
                   type: "single_line_text_field",
                 },
               ],
