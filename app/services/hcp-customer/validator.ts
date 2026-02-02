@@ -47,6 +47,7 @@ export class CustomerValidator {
   validate(data: unknown): ValidatedCustomerInput {
     const result = CreateCustomerSchema.safeParse(data);
     if (!result.success) {
+      console.error("Validator: Final schema validation failed:", JSON.stringify(result.error.issues, null, 2));
       const errors = result.error.issues.map((err) => ({
         field: err.path.join("."),
         message: err.message,
@@ -62,7 +63,14 @@ export class CustomerValidator {
       rawData[key] = value.toString();
     }
 
+    console.log("Validator: Parsed raw data:", JSON.stringify(rawData, null, 2));
+
     const rawResult = RawFormDataSchema.safeParse(rawData);
+    if (!rawResult.success) {
+      console.error("Validator: Raw schema validation failed:", rawResult.error.issues);
+    } else {
+      console.log("Validator: Raw schema validation passed, city value:", JSON.stringify(rawResult.data.city));
+    }
     if (!rawResult.success) {
       const errors = rawResult.error.issues.map((err) => ({
         field: err.path.join("."),
@@ -91,7 +99,7 @@ export class CustomerValidator {
 
     const phoneNumber = phone && country_code ? `${country_code}${phone}` : "";
 
-    return this.validate({
+    const dataToValidate = {
       firstName: first_name,
       lastName: last_name,
       email,
@@ -106,6 +114,10 @@ export class CustomerValidator {
       zip: zip,
       country,
       phone: phoneNumber,
-    });
+    };
+
+    console.log("Validator: Data to validate:", JSON.stringify(dataToValidate, null, 2));
+
+    return this.validate(dataToValidate);
   }
 }
