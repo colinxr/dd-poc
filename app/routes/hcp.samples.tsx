@@ -31,7 +31,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const result = await SamplesService.createSampleRequest(validated);
 
     return jsonResponse(result);
-  } catch (error) {
+  } catch (error: any) {
+    console.log(error);
+    console.log(error?.message);
     if (error instanceof ValidationError) {
       return jsonResponse({ errors: error.errors }, error.statusCode);
     }
