@@ -108,11 +108,6 @@ export class CustomerValidator {
       phone: phoneNumber,
     };
 
-    console.log(
-      "Validator: Data to validate:",
-      JSON.stringify(dataToValidate, null, 2),
-    );
-
     return this.validate(dataToValidate);
   }
 }

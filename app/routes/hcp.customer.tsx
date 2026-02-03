@@ -28,21 +28,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return jsonResponse({ error: errorData.error || errorText }, 422);
     }
 
-    let CustomerService, CustomerValidator;
-    try {
-      const container = createContainer(authResult.admin);
-      CustomerService = container.CustomerService;
-      CustomerValidator = container.CustomerValidator;
-      console.log(
-        "hcp.customer action: Service container created successfully",
-      );
-    } catch (containerError) {
-      console.error(
-        "hcp.customer action: Failed to create container:",
-        containerError,
-      );
-      throw containerError;
-    }
+    const container = createContainer(authResult.admin);
+    const CustomerService = container.CustomerService;
+    const CustomerValidator = container.CustomerValidator;
 
     const formData = await request.formData();
 

@@ -51,7 +51,6 @@ describe("SampleValidator", () => {
     it("should validate form data for office request (default)", () => {
       const formData = createFormData(MOCK_SAMPLE_DATA);
       const result = validator.validateFormData(formData);
-      console.log(result);
       expect(result.firstName).toBe(MOCK_SAMPLE_DATA.first_name);
     });
 
@@ -78,7 +77,6 @@ describe("SampleValidator", () => {
     it("should not require patient details when formType is not patient", () => {
       const formData = createFormData(MOCK_SAMPLE_DATA);
       const result = validator.validateFormData(formData, "office");
-      console.log(result);
       expect(result.patientEmail).toBeUndefined();
     });
   });
