@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { SampleDTO } from "./types";
 import { ValidationError } from "../shared/errors";
 
 const RawFormDataSchema = z.object({
@@ -14,6 +13,8 @@ const RawFormDataSchema = z.object({
   country: z.string().optional().default(""),
   zip: z.string().optional().default(""),
   product: z.string().optional().default(""),
+  patient_first_name: z.string().optional().default(""),
+  patient_last_name: z.string().optional().default(""),
   patient_email: z.string().optional().default(""),
   patient_phone: z.string().optional().default(""),
 });
@@ -22,6 +23,8 @@ export const SampleSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
+  patientFirstName: z.string().min(1).max(100).optional(),
+  patientLastName: z.string().min(1).max(100).optional(),
   patientEmail: z.string().email().optional(),
   patientPhone: z.string().optional().default(""),
   phone: z
@@ -53,7 +56,10 @@ export class SampleValidator {
     return result.data;
   }
 
-  validateFormData(formData: FormData, formType?: string): ValidatedSampleInput {
+  validateFormData(
+    formData: FormData,
+    formType?: string,
+  ): ValidatedSampleInput {
     const rawData: Record<string, string> = {};
     for (const [key, value] of formData.entries()) {
       rawData[key] = value.toString();
@@ -80,13 +86,47 @@ export class SampleValidator {
       country,
       zip,
       product,
+      patient_first_name,
+      patient_last_name,
       patient_email,
       patient_phone,
     } = rawResult.data;
 
     if (formType === "patient" && !patient_email) {
       throw new ValidationError([
-        { field: "patient_email", message: "Patient email is required for direct-to-patient requests" },
+        {
+          field: "patient_email",
+          message: "Patient email is required for direct-to-patient requests",
+        },
+      ]);
+    }
+
+    if (formType === "patient" && !patient_first_name) {
+      throw new ValidationError([
+        {
+          field: "patient_first_name",
+          message:
+            "Patient first name is required for direct-to-patient requests",
+        },
+      ]);
+    }
+
+    if (formType === "patient" && !patient_last_name) {
+      throw new ValidationError([
+        {
+          field: "patient_last_name",
+          message:
+            "Patient last name is required for direct-to-patient requests",
+        },
+      ]);
+    }
+
+    if (formType === "patient" && !patient_phone) {
+      throw new ValidationError([
+        {
+          field: "patient_phone",
+          message: "Patient phone is required for direct-to-patient requests",
+        },
       ]);
     }
 
@@ -102,6 +142,8 @@ export class SampleValidator {
       country,
       zip,
       productId: product,
+      patientFirstName: patient_first_name || undefined,
+      patientLastName: patient_last_name || undefined,
       patientEmail: patient_email || undefined,
       patientPhone: patient_phone || undefined,
     });

@@ -10,7 +10,10 @@ interface AdminApi {
 export class SampleRepository {
   constructor(private admin: AdminApi) {}
 
-  private ensureGlobalId(id: string, type: "Product" | "ProductVariant"): string {
+  private ensureGlobalId(
+    id: string,
+    type: "Product" | "ProductVariant",
+  ): string {
     if (id.startsWith("gid://")) {
       return id;
     }
@@ -91,8 +94,8 @@ export class SampleRepository {
                 },
               ],
               shippingAddress: {
-                firstName: dto.firstName,
-                lastName: dto.lastName,
+                firstName: dto.patientFirstName || dto.firstName,
+                lastName: dto.patientLastName || dto.lastName,
                 address1: dto.address1,
                 address2: dto.address2 || undefined,
                 city: dto.city,
@@ -107,7 +110,7 @@ export class SampleRepository {
                 ...(dto.patientEmail
                   ? [
                       {
-                        namespace: "custom",
+                        namespace: "hcp",
                         key: "patient_email",
                         type: "single_line_text_field",
                         value: dto.patientEmail,
@@ -117,7 +120,7 @@ export class SampleRepository {
                 ...(dto.patientPhone
                   ? [
                       {
-                        namespace: "custom",
+                        namespace: "hcp",
                         key: "patient_phone",
                         type: "single_line_text_field",
                         value: dto.patientPhone,
@@ -137,7 +140,9 @@ export class SampleRepository {
       const result = await mutation.json();
 
       if (result.data?.draftOrderCreate?.userErrors?.length > 0) {
-        throw new DraftOrderCreationError(result.data.draftOrderCreate.userErrors);
+        throw new DraftOrderCreationError(
+          result.data.draftOrderCreate.userErrors,
+        );
       }
 
       return result.data?.draftOrderCreate?.draftOrder;
@@ -173,9 +178,7 @@ export class ProductNotFoundError extends Error {
 export class DraftOrderCreationError extends Error {
   public statusCode = 422;
 
-  constructor(
-    public errors: Array<{ field: string; message: string }>,
-  ) {
+  constructor(public errors: Array<{ field: string; message: string }>) {
     super("Draft order creation failed");
     this.name = "DraftOrderCreationError";
   }

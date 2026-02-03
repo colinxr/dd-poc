@@ -10,6 +10,8 @@ export interface SampleDTO {
   country: string;
   zip: string;
   productId: string;
+  patientFirstName?: string;
+  patientLastName?: string;
   patientEmail?: string;
   patientPhone?: string;
 }

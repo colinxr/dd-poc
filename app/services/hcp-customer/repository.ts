@@ -40,7 +40,7 @@ export class CustomerRepository {
               tags: dto.tags,
               addresses: [
                 {
-                  address1: dto.addressLine1,
+                  address1: dto.address1,
                   address2: dto.address2,
                   city: dto.city,
                   provinceCode: dto.province,

@@ -31,7 +31,7 @@ describe("hcp.samples route action", () => {
 
   it("should return 200 and order data on success", async () => {
     const formData = createFormData(MOCK_SAMPLE_DATA);
-    const request = new Request("https://test.com/hcp/samples", {
+    const request = new Request("https://test.com/hcp/samples?type=practise", {
       method: "POST",
       body: formData,
     });
@@ -81,7 +81,13 @@ describe("hcp.samples route action", () => {
   });
 
   it("should succeed for direct-to-patient request with patientEmail", async () => {
-    const patientData = { ...MOCK_SAMPLE_DATA, patient_email: "patient@example.com" };
+    const patientData = {
+      ...MOCK_SAMPLE_DATA,
+      patient_first_name: "tk",
+      patient_last_name: "tk",
+      patient_phone: "5555555555",
+      patient_email: "patient@example.com",
+    };
     const formData = createFormData(patientData);
     const request = new Request("https://test.com/hcp/samples?type=patient", {
       method: "POST",
@@ -125,6 +131,8 @@ describe("hcp.samples route action", () => {
     const result = await response.json();
 
     expect(response.status).toBe(422);
-    expect(result.errors.some((e: any) => e.field === "patient_email")).toBe(true);
+    expect(result.errors.some((e: any) => e.field === "patient_email")).toBe(
+      true,
+    );
   });
 });

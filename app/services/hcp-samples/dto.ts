@@ -14,6 +14,10 @@ export class SampleFormParser {
       country: formData.get("country")?.toString() || "",
       zip: formData.get("zip")?.toString() || "",
       productId: formData.get("product")?.toString() || "",
+      patientFirstName: formData.get("patient_first_name")?.toString() || "",
+      patientLastName: formData.get("patient_last_name")?.toString() || "",
+      patientEmail: formData.get("patient_email")?.toString() || "",
+      patientPhone: formData.get("patient_phone")?.toString() || "",
     };
   }
 }

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { CreateCustomerInput } from "./types";
 import { ValidationError } from "../shared/errors";
 
 const RawFormDataSchema = z.object({
@@ -47,7 +46,6 @@ export class CustomerValidator {
   validate(data: unknown): ValidatedCustomerInput {
     const result = CreateCustomerSchema.safeParse(data);
     if (!result.success) {
-      console.error("Validator: Final schema validation failed:", JSON.stringify(result.error.issues, null, 2));
       const errors = result.error.issues.map((err) => ({
         field: err.path.join("."),
         message: err.message,
@@ -63,14 +61,8 @@ export class CustomerValidator {
       rawData[key] = value.toString();
     }
 
-    console.log("Validator: Parsed raw data:", JSON.stringify(rawData, null, 2));
-
     const rawResult = RawFormDataSchema.safeParse(rawData);
-    if (!rawResult.success) {
-      console.error("Validator: Raw schema validation failed:", rawResult.error.issues);
-    } else {
-      console.log("Validator: Raw schema validation passed, city value:", JSON.stringify(rawResult.data.city));
-    }
+
     if (!rawResult.success) {
       const errors = rawResult.error.issues.map((err) => ({
         field: err.path.join("."),
@@ -116,7 +108,10 @@ export class CustomerValidator {
       phone: phoneNumber,
     };
 
-    console.log("Validator: Data to validate:", JSON.stringify(dataToValidate, null, 2));
+    console.log(
+      "Validator: Data to validate:",
+      JSON.stringify(dataToValidate, null, 2),
+    );
 
     return this.validate(dataToValidate);
   }
