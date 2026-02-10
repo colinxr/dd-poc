@@ -27,9 +27,11 @@ export const CreateCustomerSchema = z.object({
   credentials: z.string().min(1).max(50),
   licenseNpi: z
     .string()
-    .regex(/^\d{10}$/, "NPI must be 10 digits")
     .optional()
-    .default(""),
+    .default("")
+    .refine((val) => val === "" || /^\d{10}$/.test(val), {
+      message: "NPI must be 10 digits",
+    }),
   institutionName: z.string().min(1).max(200),
   address1: z.string().min(1).max(255),
   address2: z.string().max(255).optional().default(""),
