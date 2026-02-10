@@ -9,6 +9,18 @@ import {
 } from "../services/hcp-customer/errors";
 import { createCustomerDTO } from "../services/hcp-customer/types";
 
+// Map camelCase field names (from Zod validation) back to snake_case (form field names)
+const FIELD_NAME_MAP: Record<string, string> = {
+  firstName: "first_name",
+  lastName: "last_name",
+  licenseNpi: "license_npi",
+  institutionName: "institution_name",
+};
+
+function mapFieldName(camelCaseField: string): string {
+  return FIELD_NAME_MAP[camelCaseField] || camelCaseField;
+}
+
 export const loader = async () => {
   return new Response(null, { headers: CORS_HEADERS });
 };
@@ -41,11 +53,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse(result);
   } catch (error) {
     if (error instanceof ValidationError) {
-      return jsonResponse({ errors: error.errors }, 422);
+      const mappedErrors = error.errors.map((err) => ({
+        field: mapFieldName(err.field),
+        message: err.message,
+      }));
+      return jsonResponse({ errors: mappedErrors }, 422);
     }
 
     if (error instanceof CustomerCreationError) {
-      return jsonResponse({ errors: error.errors }, 422);
+      const mappedErrors = error.errors.map((err) => ({
+        field: mapFieldName(err.field),
+        message: err.message,
+      }));
+      return jsonResponse({ errors: mappedErrors }, 422);
     }
 
     if (error instanceof GraphQLError) {
