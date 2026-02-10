@@ -36,7 +36,7 @@ export const CreateCustomerSchema = z.object({
   city: z.string().min(1).max(100),
   province: z.string().min(2).max(50),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code format"),
-  country: z.string().length(2).default("US"),
+  country: z.string(),
   phone: z.string().optional().default(""),
 });
 
