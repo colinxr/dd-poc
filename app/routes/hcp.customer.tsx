@@ -41,19 +41,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse(result);
   } catch (error) {
     if (error instanceof ValidationError) {
-      return jsonResponse(
-        { error: error.errors.map((e: any) => e.message).join(", ") },
-        422,
-      );
+      return jsonResponse({ errors: error.errors }, 422);
     }
 
     if (error instanceof CustomerCreationError) {
-      return jsonResponse(
-        {
-          error: error.errors.map((e: any) => e.message).join(", "),
-        },
-        422,
-      );
+      return jsonResponse({ errors: error.errors }, 422);
     }
 
     if (error instanceof GraphQLError) {

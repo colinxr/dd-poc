@@ -69,6 +69,7 @@ describe("hcp.customer route action", () => {
     const result = await response.json();
 
     expect(response.status).toBe(422);
-    expect(result.error).toBeDefined();
+    expect(result.errors).toBeDefined();
+    expect(Array.isArray(result.errors)).toBe(true);
   });
 });
