@@ -79,5 +79,14 @@ describe("SampleValidator", () => {
       const result = validator.validateFormData(formData, "office");
       expect(result.patientEmail).toBeUndefined();
     });
+
+    it("should throw ValidationError when product is not selected", () => {
+      const dataWithoutProduct = {
+        ...MOCK_SAMPLE_DATA,
+        product: "",
+      };
+      const formData = createFormData(dataWithoutProduct);
+      expect(() => validator.validateFormData(formData)).toThrow(ValidationError);
+    });
   });
 });

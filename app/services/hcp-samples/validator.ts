@@ -130,6 +130,15 @@ export class SampleValidator {
       ]);
     }
 
+    if (!product || product.trim() === "") {
+      throw new ValidationError([
+        {
+          field: "product",
+          message: "Product selection is required",
+        },
+      ]);
+    }
+
     return this.validate({
       firstName: first_name,
       lastName: last_name,
