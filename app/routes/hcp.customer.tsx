@@ -21,23 +21,6 @@ function mapFieldName(camelCaseField: string): string {
   return FIELD_NAME_MAP[camelCaseField] || camelCaseField;
 }
 
-// Map snake_case form fields to camelCase for validation
-const SNAKE_TO_CAMEL_MAP: Record<string, string> = {
-  first_name: "firstName",
-  last_name: "lastName",
-  license_npi: "licenseNpi",
-  institution_name: "institutionName",
-};
-
-function snakeToCamel(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const camelKey = SNAKE_TO_CAMEL_MAP[key] || key;
-    result[camelKey] = value;
-  }
-  return result;
-}
-
 export const loader = async () => {
   return new Response(null, { headers: CORS_HEADERS });
 };
@@ -61,22 +44,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const CustomerService = container.CustomerService;
     const CustomerValidator = container.CustomerValidator;
 
-    // Handle both FormData and JSON payloads
-    let validated;
-    const contentType = request.headers.get("content-type") || "";
-    
-    if (contentType.includes("application/json")) {
-      const jsonData = await request.json() as Record<string, unknown>;
-      console.log("[HCP Customer] Received JSON payload:", jsonData);
-      // Convert snake_case to camelCase for validation
-      const camelCaseData = snakeToCamel(jsonData);
-      console.log("[HCP Customer] Converted to camelCase:", camelCaseData);
-      validated = CustomerValidator.validate(camelCaseData);
-    } else {
-      const formData = await request.formData();
-      console.log("[HCP Customer] Received FormData payload");
-      validated = CustomerValidator.validateFormData(formData);
-    }
+    const formData = await request.formData();
+    const validated = CustomerValidator.validateFormData(formData);
     const customerDto = createCustomerDTO(validated);
     const result = await CustomerService.createCustomer(customerDto);
 
@@ -119,11 +88,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    console.error("[HCP Customer] Unhandled error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return jsonResponse(
       {
-        error: errorMessage,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       },
       500,
     );
