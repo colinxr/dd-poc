@@ -29,8 +29,8 @@ export const CreateCustomerSchema = z.object({
     .string()
     .optional()
     .default("")
-    .refine((val) => val === "" || /^\d{10}$/.test(val), {
-      message: "NPI must be 10 digits",
+    .refine((val) => val === "" || /^\d{1,10}$/.test(val), {
+      message: "This credential doesn't match our records. Contact <a href='mailto:hcpsales@dosedaily.co'>hcpsales@dosedaily.co</a> for support.",
     }),
   institutionName: z.string().min(1).max(200),
   address1: z.string().min(1).max(255),
